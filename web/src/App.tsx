@@ -25,6 +25,7 @@ import { NonConformances, QualityChecks, QualitySpecs, TraceRecall } from "./pag
 import RepApp from "./pages/field/RepApp";
 import { Commissions, Notifications, Performance, Reps, Settlements } from "./pages/field/Distribution";
 import Import from "./pages/admin/Import";
+import { Employees, Leaves, MyHr, Payroll } from "./pages/hr/Hr";
 
 function ThemeToggle() {
   const { t } = useI18n();
@@ -69,12 +70,17 @@ function Shell() {
         <nav className="nav">
           {L("/", t.dashboard)}
           {L("/field", tt("يومي (تطبيق المندوب)", "My day (rep app)"), me.modules.includes("distribution") && can("distribution.field.app"))}
+          {L("/me", tt("بوابتي (الحضور والراتب)", "My HR portal"), me.modules.includes("hr") && can("hr.self.view"))}
           {me.modules.includes("sales") && <div className="nav-group">{tt("المبيعات", "Sales")}</div>}
           {L("/sales/invoices", tt("فواتير المبيعات", "Sales invoices"), me.modules.includes("sales") && can("sales.invoices.view"))}
           {L("/sales/returns", tt("مرتجعات المبيعات", "Sales returns"), me.modules.includes("sales") && can("sales.invoices.view"))}
           {L("/sales/receipts", tt("سندات القبض", "Customer receipts"), me.modules.includes("sales") && can("sales.invoices.view"))}
           {L("/customers", tt("العملاء", "Customers"), me.modules.includes("sales") && can("sales.customers.view"))}
           {L("/sales/aging", tt("أعمار الديون", "AR aging"), me.modules.includes("sales") && can("sales.reports.view"))}
+          {me.modules.includes("hr") && can("hr.employees.view") && <div className="nav-group">{tt("الموارد البشرية", "HR")}</div>}
+          {L("/hr/employees", tt("الموظفون والحضور", "Employees & attendance"), me.modules.includes("hr") && can("hr.employees.view"))}
+          {L("/hr/leave", tt("الإجازات", "Leave"), me.modules.includes("hr") && can("hr.employees.view"))}
+          {L("/hr/payroll", tt("مسير الرواتب", "Payroll"), me.modules.includes("payroll") && can("payroll.runs.prepare"))}
           {me.modules.includes("distribution") && can("distribution.reps.view") && <div className="nav-group">{tt("التوزيع", "Distribution")}</div>}
           {L("/distribution/reps", tt("المناديب والمسارات", "Reps & routes"), me.modules.includes("distribution") && can("distribution.reps.view"))}
           {L("/distribution/performance", tt("الأداء والأهداف", "Performance"), me.modules.includes("distribution") && can("distribution.reps.view"))}
@@ -154,6 +160,10 @@ function Shell() {
             <Route path="/purchasing/invoices" element={<SupplierInvoices />} />
             <Route path="/field" element={<RepApp />} />
             <Route path="/import" element={<Import />} />
+            <Route path="/me" element={<MyHr />} />
+            <Route path="/hr/employees" element={<Employees />} />
+            <Route path="/hr/leave" element={<Leaves />} />
+            <Route path="/hr/payroll" element={<Payroll />} />
             <Route path="/distribution/reps" element={<Reps />} />
             <Route path="/distribution/performance" element={<Performance />} />
             <Route path="/distribution/settlements" element={<Settlements />} />
