@@ -5,13 +5,14 @@ import type { UserCtx } from "../../core/auth.js";
 import { E } from "../../core/errors.js";
 import { audit } from "../../core/audit.js";
 import { stockIn, stockOut } from "./stock.js";
-import { docNumber, inventoryRole, itemUom, lockDraft, markPosted, minorUnits, postJournal, warehouseOf } from "./common.js";
+import { accountByRole, docNumber, inventoryRole, itemUom, lockDraft, markPosted, minorUnits, postAccounts, postJournal, warehouseOf } from "./common.js";
 
 const n = async (db: Db, sql: string, args: unknown[]) => (await db.query(sql, args)).rows[0];
 const METHOD_ROLE = { cash: "cash_main", bank: "bank_main", rep_custody: "rep_cash_custody" } as const;
 
 export interface InvoiceInput {
   companyId: string; branchId?: string | null; warehouseId: string; customerId: string; invoiceDate: string; paymentType: "cash" | "credit"; notes?: string;
+  posShiftId?: string | null; posClientId?: string | null;
   lines: { itemId: string; uomId?: string | null; qty: string; unitPrice?: string; discountPct?: string; taxPct?: string; lotId?: string | null }[];
 }
 
@@ -29,9 +30,9 @@ export async function createInvoice(db: Db, u: UserCtx, b: InvoiceInput) {
   const m = await minorUnits(db, b.companyId);
   const cur = (await db.query("SELECT base_currency FROM companies WHERE id = $1", [b.companyId])).rows[0].base_currency;
   const inv = (await db.query(
-    `INSERT INTO sales_invoices (tenant_id, company_id, branch_id, warehouse_id, customer_id, invoice_date, payment_type, currency, notes, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-    [u.tenantId, b.companyId, b.branchId ?? null, b.warehouseId, b.customerId, b.invoiceDate, b.paymentType, cur, b.notes ?? null, u.userId])).rows[0];
+    `INSERT INTO sales_invoices (tenant_id, company_id, branch_id, warehouse_id, customer_id, invoice_date, payment_type, currency, notes, created_by, pos_shift_id, pos_client_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+    [u.tenantId, b.companyId, b.branchId ?? null, b.warehouseId, b.customerId, b.invoiceDate, b.paymentType, cur, b.notes ?? null, u.userId, b.posShiftId ?? null, b.posClientId ?? null])).rows[0];
   let i = 0;
   for (const l of b.lines) {
     const { item, uomId, factor } = await itemUom(db, l.itemId, l.uomId);
@@ -60,15 +61,26 @@ export async function createInvoice(db: Db, u: UserCtx, b: InvoiceInput) {
   return getInvoice(db, inv.id);
 }
 
-export async function postInvoice(db: Db, u: UserCtx, id: string) {
+/**
+ * Posts a sales invoice. `settlement` (used by the POS) lists what was paid at
+ * the time of sale per account (drawer cash, card clearing…); whatever is not
+ * settled stays on the customer's account (AR) and must fit the credit limit.
+ */
+export async function postInvoice(db: Db, u: UserCtx, id: string, opts: { settlement?: { accountId: string; amount: string }[] } = {}) {
   const d = await lockDraft(db, u, "sales_invoices", id);
   const c = await customerOf(db, d.customer_id, d.company_id);
   const wh = await warehouseOf(db, d.warehouse_id, d.company_id);
-  if (d.payment_type === "credit" && c.credit_limit !== null) {
+  const settled = opts.settlement
+    ? (await n(db, "SELECT coalesce(sum(x::numeric), 0)::text AS s FROM unnest($1::text[]) x", [opts.settlement.map((x) => x.amount)])).s as string
+    : null;
+  const onAccount = settled === null ? (d.payment_type === "credit" ? d.total : "0") : (await n(db, "SELECT ($1::numeric - $2::numeric)::text AS r", [d.total, settled])).r as string;
+  if (Number(onAccount) < 0) throw E.rule("OVERPAID", "المدفوع يتجاوز قيمة الفاتورة", "Payments exceed the invoice total");
+  if (Number(onAccount) > 0 && d.payment_type !== "credit") throw E.rule("NOT_FULLY_PAID", "فاتورة نقدية يجب أن تُسدد بالكامل", "A cash invoice must be fully paid");
+  if (Number(onAccount) > 0 && c.credit_limit !== null) {
     const open = (await n(db, "SELECT coalesce(sum(total - amount_paid - amount_returned),0)::text AS o FROM sales_invoices WHERE customer_id = $1 AND status = 'posted'", [c.id])).o;
-    const over = (await n(db, "SELECT ($1::numeric + $2::numeric) > $3::numeric AS over", [open, d.total, c.credit_limit])).over;
-    if (over) throw E.rule("CREDIT_LIMIT_EXCEEDED", `تجاوز حد الائتمان للعميل (الرصيد ${open} + الفاتورة ${d.total} > الحد ${c.credit_limit})`,
-      `Credit limit exceeded (open ${open} + invoice ${d.total} > limit ${c.credit_limit})`, { open, invoice: d.total, limit: c.credit_limit });
+    const over = (await n(db, "SELECT ($1::numeric + $2::numeric) > $3::numeric AS over", [open, onAccount, c.credit_limit])).over;
+    if (over) throw E.rule("CREDIT_LIMIT_EXCEEDED", `تجاوز حد الائتمان للعميل (الرصيد ${open} + الفاتورة ${onAccount} > الحد ${c.credit_limit})`,
+      `Credit limit exceeded (open ${open} + invoice ${onAccount} > limit ${c.credit_limit})`, { open, invoice: onAccount, limit: c.credit_limit });
   }
   const lines = (await db.query("SELECT l.*, i.code, i.kind, i.track_lots FROM sales_invoice_lines l JOIN items i ON i.id = l.item_id WHERE l.doc_id = $1 ORDER BY line_no", [id])).rows;
   if (!lines.length) throw E.rule("EMPTY_DOCUMENT", "المستند بلا أسطر", "Document has no lines");
@@ -83,17 +95,22 @@ export async function postInvoice(db: Db, u: UserCtx, id: string) {
     parts.push({ role: "cogs", amount: out.value }, { role: inventoryRole(wh.kind, l.kind), amount: "-" + out.value });
     cogs = (await n(db, "SELECT ($1::numeric + $2::numeric)::text AS t", [cogs, out.value])).t;
   }
-  parts.push(
+  if (settled === null) parts.push(
     // cash taken by a rep sits in the rep's custody until handed over
-    { role: d.payment_type === "cash" ? (d.rep_id ? "rep_cash_custody" : "cash_main") : "ar", amount: d.total },
+    { role: d.payment_type === "cash" ? (d.rep_id ? "rep_cash_custody" : "cash_main") : "ar", amount: d.total });
+  else if (Number(onAccount) > 0) parts.push({ role: "ar", amount: onAccount });
+  parts.push(
     { role: "sales_revenue", amount: "-" + d.subtotal },
     { role: "sales_discounts", amount: d.discount_total },
     { role: "tax_payable", amount: "-" + d.tax_total },
   );
   const number = await docNumber(db, u, d.company_id, "SI", d.invoice_date);
-  const je = await postJournal(db, u, { companyId: d.company_id, date: d.invoice_date, memo: `فاتورة مبيعات ${number} — ${c.name_ar}`, sourceType: "sales_invoice", sourceId: id, parts });
+  const accParts: { accountId: string; amount: string }[] = [];
+  for (const p of parts) accParts.push({ accountId: await accountByRole(db, d.company_id, p.role), amount: p.amount });
+  for (const x of opts.settlement ?? []) accParts.push({ accountId: x.accountId, amount: x.amount });
+  const je = await postAccounts(db, u, { companyId: d.company_id, date: d.invoice_date, memo: `فاتورة مبيعات ${number} — ${c.name_ar}`, sourceType: "sales_invoice", sourceId: id, parts: accParts });
   const due = (await n(db, "SELECT ($1::date + $2::int)::text AS d", [d.invoice_date, d.payment_type === "credit" ? c.payment_terms_days : 0])).d;
-  await markPosted(db, u, "sales_invoices", id, number, je, { cogs_total: cogs, due_date: due, amount_paid: d.payment_type === "cash" ? d.total : 0 });
+  await markPosted(db, u, "sales_invoices", id, number, je, { cogs_total: cogs, due_date: due, amount_paid: settled ?? (d.payment_type === "cash" ? d.total : 0) });
   await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "sales_invoice.posted", entityType: "sales_invoice", entityId: id, after: { number, total: d.total, cogs, journal: je } });
   return getInvoice(db, id);
 }
@@ -134,7 +151,8 @@ export async function createReturn(db: Db, u: UserCtx, b: { invoiceId: string; w
   return (await db.query("SELECT * FROM sales_returns WHERE id = $1", [r.id])).rows[0];
 }
 
-export async function postReturn(db: Db, u: UserCtx, id: string) {
+/** `refundAccountId`: where the cash/card refund of a paid invoice comes from (POS drawer, card clearing); default main cash */
+export async function postReturn(db: Db, u: UserCtx, id: string, opts: { refundAccountId?: string } = {}) {
   const d = await lockDraft(db, u, "sales_returns", id);
   const inv = (await db.query("SELECT * FROM sales_invoices WHERE id = $1 FOR UPDATE", [d.invoice_id])).rows[0];
   const lines = (await db.query(
@@ -172,9 +190,12 @@ export async function postReturn(db: Db, u: UserCtx, id: string) {
     await db.query("UPDATE sales_invoices SET amount_paid = amount_paid - $2, amount_returned = amount_returned + $2 WHERE id = $1", [inv.id, d.total]);
   }
   const number = await docNumber(db, u, d.company_id, "SR", d.return_date);
-  const je = await postJournal(db, u, { companyId: d.company_id, date: d.return_date, memo: `مرتجع مبيعات ${number} على الفاتورة ${inv.number}`, sourceType: "sales_return", sourceId: id, parts: [
-    { role: "sales_returns", amount: d.total }, { role: inv.payment_type === "cash" ? "cash_main" : "ar", amount: "-" + d.total },
-    { role: "inventory_quarantine", amount: cost }, { role: "cogs", amount: "-" + cost },
+  const credit = inv.payment_type === "cash"
+    ? (opts.refundAccountId ?? await accountByRole(db, d.company_id, "cash_main"))
+    : await accountByRole(db, d.company_id, "ar");
+  const je = await postAccounts(db, u, { companyId: d.company_id, date: d.return_date, memo: `مرتجع مبيعات ${number} على الفاتورة ${inv.number}`, sourceType: "sales_return", sourceId: id, parts: [
+    { accountId: await accountByRole(db, d.company_id, "sales_returns"), amount: d.total }, { accountId: credit, amount: "-" + d.total },
+    { accountId: await accountByRole(db, d.company_id, "inventory_quarantine"), amount: cost }, { accountId: await accountByRole(db, d.company_id, "cogs"), amount: "-" + cost },
   ] });
   await markPosted(db, u, "sales_returns", id, number, je, { cost_total: cost });
   await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "sales_return.posted", entityType: "sales_return", entityId: id, after: { number, total: d.total, cost } });

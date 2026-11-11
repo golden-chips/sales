@@ -109,7 +109,7 @@ export async function masterDataRoutes(app: FastifyInstance) {
       companyId: zUuid, code: z.string().regex(/^[A-Z0-9_.-]{1,30}$/), nameAr: z.string().min(2), nameEn: z.string().optional(),
       kind: z.enum(["raw", "packaging", "semi_finished", "finished", "service"]), baseUomId: zUuid, barcode: z.string().optional(),
       trackLots: z.boolean().default(false), shelfLifeDays: z.number().int().positive().optional(), salesPrice: zMoney.optional(), reorderLevel: zMoney.optional(),
-      units: z.array(z.object({ uomId: zUuid, factor: z.string().regex(/^\d{1,10}(\.\d{1,6})?$/) })).default([]),
+      units: z.array(z.object({ uomId: zUuid, factor: z.string().regex(/^\d{1,10}(\.\d{1,6})?$/), barcode: z.string().min(1).max(64).optional() })).default([]),
     }), req.body);
     const r = await tdb(req, async (db) => {
       const x = (await db.query(
@@ -118,7 +118,13 @@ export async function masterDataRoutes(app: FastifyInstance) {
         [req.user!.tenantId, b.companyId, b.code, b.nameAr, b.nameEn ?? null, b.kind, b.baseUomId, b.barcode ?? null, b.trackLots, b.shelfLifeDays ?? null, b.salesPrice ?? null, b.reorderLevel ?? null])).rows[0];
       for (const un of b.units) {
         if (un.uomId === b.baseUomId) throw E.validation([{ path: "units", message: "base unit cannot be an alternative unit" }]);
-        await db.query("INSERT INTO item_uoms (tenant_id, item_id, uom_id, factor) VALUES ($1,$2,$3,$4)", [req.user!.tenantId, x.id, un.uomId, un.factor]);
+        if (un.barcode) {
+          // a barcode identifies exactly one item/unit in the company (the POS scans either level)
+          const used = (await db.query(`SELECT 1 FROM items WHERE company_id = $1 AND barcode = $2
+                                         UNION ALL SELECT 1 FROM item_uoms iu JOIN items i ON i.id = iu.item_id WHERE i.company_id = $1 AND iu.barcode = $2`, [b.companyId, un.barcode])).rowCount;
+          if (used) throw E.conflict(`الباركود ${un.barcode} مستخدم لصنف أو وحدة أخرى`, `Barcode ${un.barcode} is already used`);
+        }
+        await db.query("INSERT INTO item_uoms (tenant_id, item_id, uom_id, factor, barcode) VALUES ($1,$2,$3,$4,$5)", [req.user!.tenantId, x.id, un.uomId, un.factor, un.barcode ?? null]);
       }
       await audit(db, { ...ac(req), action: "item.created", entityType: "item", entityId: x.id, after: b });
       return x;

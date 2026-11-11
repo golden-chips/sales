@@ -5,7 +5,7 @@
 |---|---|---|
 | Sign in | `/platform` with a platform user (seeded from `PLATFORM_ADMIN_*`) | separate identity from tenant users; TOTP supported |
 | Plans | Seeded: starter, business, professional, manufacturing, enterprise (prices = 0 placeholders) | `POST /api/v1/platform/plans` to add |
-| Provision a tenant | «Provision tenant» | creates tenant, settings, company, HQ branch, 18 system roles, owner user (owner role), subscription (trial if the plan has trial days, otherwise active + first invoice) — all in one transaction |
+| Provision a tenant | «Provision tenant» | creates tenant, settings, company, HQ branch, 20 system roles, owner user (owner role), subscription (trial if the plan has trial days, otherwise active + first invoice) — all in one transaction |
 | Suspend / reactivate / cancel | tenant detail | reason required; suspension revokes all sessions immediately; audited at platform level |
 | Change plan | tenant detail | blocked with details if current usage exceeds the target plan's limits; issues an invoice |
 | Mark invoice paid | tenant detail → invoices | |
