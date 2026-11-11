@@ -82,7 +82,7 @@ erDiagram
 | `branches` | Head office / factory / branch / site | kind enum; FK to company |
 | `warehouses` | Storage locations | kinds incl. `quarantine`, `damaged`, `van`; **CHECK: quarantine/damaged can never be sellable** |
 | `users` | Tenant users | unique email per tenant; bcrypt hash; lockout counters; TOTP |
-| `roles` / `role_permissions` | RBAC | 16 system roles seeded and re-synced; custom roles allowed |
+| `roles` / `role_permissions` | RBAC | 18 system roles seeded and re-synced; custom roles allowed |
 | `user_roles` | Assignments | optional `branch_id` scope; unique per (user, role, branch) |
 | `refresh_tokens` | Sessions | SHA-256 hash only; `family_id` for reuse detection |
 | `login_attempts` | Security log | every success/failure with reason and IP |

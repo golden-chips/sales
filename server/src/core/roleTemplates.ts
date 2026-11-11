@@ -9,7 +9,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
   { code: "tenant_owner", nameAr: "مالك الحساب", nameEn: "Tenant Owner", grants: ["*"] },
   { code: "company_admin", nameAr: "مدير النظام للشركة", nameEn: "Company Admin", grants: ["core.*", "*.view"] },
   { code: "branch_manager", nameAr: "مدير فرع", nameEn: "Branch Manager", grants: ["*.view", "core.users.view"] },
-  { code: "finance_manager", nameAr: "المدير المالي", nameEn: "Finance Manager", grants: ["accounting.*", "purchasing.*", "sales.receipts.*", "distribution.commissions.*", "distribution.cash.*", "distribution.reps.view", "payroll.runs.approve", "payroll.runs.pay", "payroll.loans.manage", "hr.employees.view", "hr.salaries.view", "sales.reports.view", "sales.invoices.view", "sales.customers.view", "inventory.stock.view", "inventory.items.view", "core.org.view", "core.audit.view"] },
+  { code: "finance_manager", nameAr: "المدير المالي", nameEn: "Finance Manager", grants: ["accounting.*", "purchasing.*", "sales.receipts.*", "distribution.commissions.*", "distribution.cash.*", "distribution.reps.view", "payroll.runs.approve", "payroll.runs.pay", "payroll.loans.manage", "assets.register.*", "assets.depreciation.*", "assets.maintenance.view", "hr.employees.view", "hr.salaries.view", "sales.reports.view", "sales.invoices.view", "sales.customers.view", "inventory.stock.view", "inventory.items.view", "core.org.view", "core.audit.view"] },
   { code: "accountant", nameAr: "محاسب", nameEn: "Accountant",
     grants: ["accounting.accounts.view", "accounting.journal.view", "accounting.journal.create", "accounting.journal.post", "accounting.reports.view", "accounting.fx.manage", "core.org.view",
       "sales.invoices.view", "sales.customers.view", "sales.receipts.create", "sales.reports.view", "purchasing.receipts.view", "purchasing.suppliers.view",
@@ -19,8 +19,11 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
   { code: "warehouse_manager", nameAr: "مدير المخازن", nameEn: "Warehouse Manager", grants: ["inventory.items.*", "inventory.stock.*", "inventory.moves.*", "purchasing.receipts.*", "purchasing.suppliers.view", "core.org.view"] },
   // quarantine release is deliberately NOT a warehouse permission: releasing goods after inspection belongs to Quality (food safety SoD),
   { code: "warehouse_worker", nameAr: "أمين/عامل مخزن", nameEn: "Warehouse Worker", grants: ["inventory.moves.create", "inventory.stock.view", "inventory.items.view", "purchasing.receipts.create", "purchasing.receipts.view", "purchasing.suppliers.view"] },
-  { code: "production_manager", nameAr: "مدير الإنتاج", nameEn: "Production Manager", grants: ["manufacturing.*", "inventory.stock.view", "inventory.items.view", "quality.view"] }, // inspection is Quality's job, not production's (SoD)
+  { code: "production_manager", nameAr: "مدير الإنتاج", nameEn: "Production Manager", grants: ["manufacturing.*", "assets.maintenance.*", "assets.register.view", "inventory.stock.view", "inventory.items.view", "quality.view"] }, // inspection is Quality's job, not production's (SoD)
   { code: "production_operator", nameAr: "مشغل إنتاج", nameEn: "Production Operator", grants: ["manufacturing.execution.*", "manufacturing.orders.view", "manufacturing.boms.view", "inventory.items.view", "inventory.stock.view"] },
+  // maintenance runs the machines but does not capitalize, depreciate or dispose of them (finance)
+  { code: "maintenance_manager", nameAr: "مدير الصيانة", nameEn: "Maintenance Manager", grants: ["assets.maintenance.*", "assets.register.view", "inventory.items.view", "inventory.stock.view", "core.org.view"] },
+  { code: "maintenance_technician", nameAr: "فني صيانة", nameEn: "Maintenance Technician", grants: ["assets.maintenance.view", "assets.maintenance.manage", "assets.register.view", "inventory.items.view"] },
   { code: "hr_manager", nameAr: "مدير الموارد البشرية", nameEn: "HR Manager", grants: ["hr.*", "payroll.*", "core.org.view"] },
   { code: "employee", nameAr: "موظف", nameEn: "Employee", grants: ["hr.self.*"] },
   { code: "quality_manager", nameAr: "مدير الجودة", nameEn: "Quality Manager", grants: ["quality.*", "inventory.stock.view", "inventory.items.view", "inventory.quarantine.release", "inventory.moves.post"] },

@@ -28,6 +28,7 @@ import RepApp from "./pages/field/RepApp";
 import { Commissions, Notifications, Performance, Reps, Settlements } from "./pages/field/Distribution";
 import Import from "./pages/admin/Import";
 import { Employees, Leaves, MyHr, Payroll } from "./pages/hr/Hr";
+import { AssetRegister, Depreciation, Maintenance } from "./pages/assets/Assets";
 
 function ThemeToggle() {
   const { t } = useI18n();
@@ -106,6 +107,10 @@ function Shell() {
           {L("/quality/ncr", tt("عدم المطابقة", "Non-conformance"), me.modules.includes("quality") && can("quality.view"))}
           {L("/quality/trace", tt("التتبع والاستدعاء", "Trace & recall"), me.modules.includes("quality") && can("quality.view"))}
           {L("/quality/specs", tt("المواصفات و HACCP", "Specs & HACCP"), me.modules.includes("quality") && can("quality.view"))}
+          {me.modules.includes("assets") && (can("assets.register.view") || can("assets.maintenance.view")) && <div className="nav-group">{tt("الأصول والصيانة", "Assets & maintenance")}</div>}
+          {L("/assets", tt("سجل الأصول", "Asset register"), me.modules.includes("assets") && can("assets.register.view"))}
+          {L("/assets/depreciation", tt("الإهلاك", "Depreciation"), me.modules.includes("assets") && can("assets.register.view"))}
+          {L("/maintenance", tt("الصيانة", "Maintenance"), me.modules.includes("assets") && can("assets.maintenance.view"))}
           {hasAcc && can("accounting.journal.view") && <div className="nav-group">{t.groupFinance}</div>}
           {L("/accounts", t.coa, hasAcc && can("accounting.accounts.view"))}
           {L("/journal", t.journal, hasAcc && can("accounting.journal.view"))}
@@ -179,6 +184,9 @@ function Shell() {
             <Route path="/quality/ncr" element={<NonConformances />} />
             <Route path="/quality/trace" element={<TraceRecall />} />
             <Route path="/quality/specs" element={<QualitySpecs />} />
+            <Route path="/assets" element={<AssetRegister />} />
+            <Route path="/assets/depreciation" element={<Depreciation />} />
+            <Route path="/maintenance" element={<Maintenance />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

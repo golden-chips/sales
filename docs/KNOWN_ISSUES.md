@@ -34,3 +34,5 @@ Legacy systems findings (V1–V10, H1–H6) are in `PHASE0_DISCOVERY_AUDIT.md`; 
 | K28 | Low | Web dependency advisories left: react-router moderate (fix = v7, breaking), vite dev-server high (dev only; fix = vite 6+) | Planned upgrade |
 | K29 | Info | The APK talks to the server set in `GOLDEN_API_BASE`; without hosting (D5) it cannot reach a server | Hosting decision |
 | K30 | Low | HR engine ports the core حضوري rules; rosters/rotating shifts, multiple sites, coverage pay and supervisor tools from حضوري are not ported yet | Phase 5 remainder |
+| K31 | Medium | Assets: buying an asset on a supplier invoice (asset line in the supplier invoice) is not implemented — capitalization credits bank/cash/opening balance or a non-control liability | Phase 6 remainder |
+| K32 | Low | Assets: revaluation, impairment, units-of-production depreciation, split/merge, inter-company transfer not implemented | Later |

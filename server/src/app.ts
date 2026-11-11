@@ -21,6 +21,7 @@ import { fieldRoutes } from "./modules/field/field.routes.js";
 import { importRoutes } from "./modules/import/import.routes.js";
 import { hrRoutes, iclockRoutes } from "./modules/hr/hr.routes.js";
 import { publicRoutes } from "./modules/platform/public.routes.js";
+import { assetRoutes } from "./modules/assets/assets.routes.js";
 import { pool } from "./db/pool.js";
 
 const PG_MAP: Record<string, [number, string, string, string]> = {
@@ -98,6 +99,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     await v1.register(fieldRoutes);
     await v1.register(importRoutes);
     await v1.register(hrRoutes);
+    await v1.register(assetRoutes);
   }, { prefix: "/api/v1" });
   // fingerprint devices (ZKTeco iclock/ADMS) post to a fixed path at the server root
   await app.register(iclockRoutes);

@@ -36,18 +36,35 @@ export async function minorUnits(db: Db, companyId: string): Promise<number> {
  * integration contract (idempotent per source).
  */
 export async function postJournal(db: Db, u: UserCtx, p: { companyId: string; date: string; memo: string; sourceType: string; sourceId: string; parts: { role: string; amount: string | number; description?: string }[] }) {
+  const parts = [];
+  for (const part of p.parts) parts.push({ accountId: await accountByRole(db, p.companyId, part.role), amount: part.amount, description: part.description });
+  return postAccounts(db, u, { ...p, parts });
+}
+
+/** Same as postJournal, for callers that already hold explicit account ids (asset categories, user-chosen accounts). */
+export async function postAccounts(db: Db, u: UserCtx, p: { companyId: string; date: string; memo: string; sourceType: string; sourceId: string; parts: { accountId: string; amount: string | number; description?: string }[] }) {
   const byAcc = new Map<string, { amount: string; description?: string }>();
   for (const part of p.parts) {
-    const acc = await accountByRole(db, p.companyId, part.role);
-    const prev = byAcc.get(acc);
+    const prev = byAcc.get(part.accountId);
     const sum = (await db.query("SELECT ($1::numeric + $2::numeric)::text AS s", [prev?.amount ?? "0", String(part.amount)])).rows[0].s;
-    byAcc.set(acc, { amount: sum, description: prev?.description ?? part.description });
+    byAcc.set(part.accountId, { amount: sum, description: prev?.description ?? part.description });
   }
   const lines = [...byAcc.entries()].filter(([, v]) => Number(v.amount) !== 0).map(([accountId, v]) =>
     v.amount.startsWith("-") ? { accountId, credit: v.amount.slice(1), description: v.description } : { accountId, debit: v.amount, description: v.description });
   if (lines.length < 2) return null; // nothing with financial effect (e.g. zero-cost transfer)
   const r = await postFromSource(db, u, { companyId: p.companyId, entryDate: p.date, memo: p.memo, sourceType: p.sourceType, sourceId: p.sourceId, lines });
   return r.entry.id as string;
+}
+
+/** validates that a user-chosen account belongs to the company, is active and postable, and (optionally) of the expected type */
+export async function postableAccount(db: Db, companyId: string, accountId: string, field: string, types?: string[], opts: { noControl?: boolean } = {}) {
+  const a = (await db.query("SELECT id, code, type, role, is_active, is_postable FROM accounts WHERE id = $1 AND company_id = $2", [accountId, companyId])).rows[0];
+  if (!a) throw E.validation([{ path: field, message: "account not found in this company" }]);
+  if (!a.is_active || !a.is_postable) throw E.validation([{ path: field, message: `account ${a.code} is not an active posting account` }]);
+  if (types && !types.includes(a.type)) throw E.validation([{ path: field, message: `account ${a.code} must be of type ${types.join("/")}` }]);
+  // receivable/payable control accounts are only moved by customer/supplier documents, so their subledgers always reconcile
+  if (opts.noControl && ["ar", "ap"].includes(a.role)) throw E.rule("CONTROL_ACCOUNT", `الحساب ${a.code} حساب مراقبة (ذمم) يُرحَّل إليه من مستندات العملاء/الموردين فقط`, `Account ${a.code} is a receivable/payable control account, posted only by customer/supplier documents`);
+  return a;
 }
 
 export async function docNumber(db: Db, u: UserCtx, companyId: string, prefix: string, date: string) {
