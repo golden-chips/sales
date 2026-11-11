@@ -19,12 +19,12 @@ Status legend: ✅ written and matches the code · 🟡 partial (covers what exi
 | 13 | Accounting workflows | [ACCOUNTING_WORKFLOWS.md](ACCOUNTING_WORKFLOWS.md), [MODULE_MAP_AND_INTEGRATIONS.md](MODULE_MAP_AND_INTEGRATIONS.md) | ✅ |
 | 14 | Manufacturing & quality workflows | [MANUFACTURING_QUALITY.md](MANUFACTURING_QUALITY.md) | ✅ |
 | 15 | HR workflows | [MODULE_MAP_AND_INTEGRATIONS.md](MODULE_MAP_AND_INTEGRATIONS.md) rows 11–12 | ⏳ design only (Phase 5) |
-| 16 | Sales, purchasing & inventory workflows | [SALES_PURCHASING_INVENTORY.md](SALES_PURCHASING_INVENTORY.md) | ✅ (field sales/distribution: Phase 4) |
+| 16 | Sales, purchasing & inventory workflows | [SALES_PURCHASING_INVENTORY.md](SALES_PURCHASING_INVENTORY.md) | ✅ + [FIELD_SALES_DISTRIBUTION.md](FIELD_SALES_DISTRIBUTION.md) ✅ |
 | 17 | Security documentation | [SECURITY.md](SECURITY.md) | ✅ |
 | 18 | Backup & recovery | [INSTALLATION.md](INSTALLATION.md) §5 | 🟡 procedure written, not drilled |
 | 19 | Troubleshooting | [INSTALLATION.md](INSTALLATION.md) §7 | ✅ |
 | 20 | Testing strategy | [TESTING.md](TESTING.md) | ✅ |
-| 21 | Test results | [TESTING.md](TESTING.md) | ✅ (78/78, real runs) |
+| 21 | Test results | [TESTING.md](TESTING.md) | ✅ (92/92, real runs) |
 | 22 | Change log | [CHANGELOG.md](CHANGELOG.md) | ✅ |
 | 23 | Release notes | [RELEASE_NOTES.md](RELEASE_NOTES.md) | ✅ |
 | 24 | Known issues | [KNOWN_ISSUES.md](KNOWN_ISSUES.md) | ✅ |

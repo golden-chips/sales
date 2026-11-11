@@ -5,7 +5,7 @@
 | Level | Tooling | Status |
 |---|---|---|
 | Unit | Vitest | Pure helpers are covered through integration tests for now; dedicated unit tests come with Phase 2b costing logic |
-| **Integration (API + DB)** | Vitest + Fastify `inject` + **real PostgreSQL 16**, connecting as the non-superuser `golden_app` role | **78 tests, all passing** (see results) |
+| **Integration (API + DB)** | Vitest + Fastify `inject` + **real PostgreSQL 16**, connecting as the non-superuser `golden_app` role | **92 tests, all passing** (see results; one open intermittent issue K12) |
 | Security | RLS isolation, forged tokens, privilege escalation, SoD, lockout, refresh-token reuse, MFA | Included in the 52 |
 | Accounting | balance, immutability (also by bypassing the service layer), reversal, closed periods, FX rounding, idempotency, trial-balance/ledger/statement reconciliation | Included |
 | SaaS | plan limits, downgrade guard, suspend/reactivate, trial → past_due → suspended sweep | Included |
@@ -110,3 +110,12 @@ Full suite: **78 / 78** in 3 consecutive runs.
 **Defect found by these tests:** the subledger/GL reconciliation failed by 0.0002 — stock values used 4 decimals while the GL uses the currency's 3. Fixed for all stock valuations.
 
 Browser E2E (demo-foods): formula with standard cost → create, release, issue 4 materials, record hours, complete order → cost actual vs standard → QC entry with frying temperature 192 °C (CCP) → failed, lot on hold, NCR opened → trace from potato lot to the finished lot. No console errors.
+
+
+## Results — Phase 4 (2026-11-11)
+
+`test/field-sales.test.ts` — 14 tests: rep registration rules; expired stock cannot be loaded into a van; load requested by rep and posted by the warehouse; offline batch with 7 ops → 4 accepted / 3 rejected (unassigned customer, discount above ceiling, typed price); re-sync of the same batch → all replayed, still 2 invoices and the same van quantity; custody 50 = GL 1112; handover over custody rejected, rep cannot confirm own cash, counted > declared rejected, shortage 2.000 charged; settlement count required, approved by supervisor, shortage 2.400 charged; commission 2% of collected only, SoD on posting, sales manager cannot post, tiered calculation 5.500; performance vs targets (50% / 50% / 25%); isolation between reps; GPS policy and retry of a rejected op with the same clientId; recall queues one WhatsApp notice and blocks van sales of the lot; stock = GL and trial balance balanced.
+
+Full suite: **92 / 92** in 6 of 8 runs; the 2 failing runs hit the open intermittent issue **K12** (see KNOWN_ISSUES), which has not reproduced since a diagnostic probe was added.
+
+Browser E2E (phone viewport, demo-foods): rep goes offline, records an invoice and a visit (queued, "pending sync"), comes back online → automatic sync, queue empty; the same receipt sent twice → second response `replayed: true` with the same id; totals and custody correct after reload. **The first run of this test exposed that the van held only expired stock and the app displayed it as available — fixed (two rules + demo data).**

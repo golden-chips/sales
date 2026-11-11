@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0 — 2026-11-11 — Phase 4: field sales & distribution
+### Added
+- Migration 007: territories, sales reps (van warehouse, flat/tiered commission, discount ceiling), routes, monthly targets, visits, idempotent field operations, cash handovers, van day settlements, commission runs, notification outbox, optional GPS policy.
+- `POST /field/sync`: offline batch where each op is atomic and idempotent per (rep, clientId); price list only, discount ceiling, assigned customers only, credit limit, lot rules.
+- Rep cash custody (subledger = GL 1112), cashier-confirmed handover with shortage charged to the rep, supervisor-approved van settlement, commissions on collected money posted by finance with SoD, rep performance vs targets, recall → WhatsApp notices queued.
+- Web: rep app `/field` (mobile, offline queue with automatic sync), reps & routes, performance, settlements & cash, commissions, customer messages. DEMO rep with a loaded van.
+- 14 new integration tests (92 total).
+### Fixed
+- Expired or held lots could be moved into a sellable warehouse (e.g. loaded onto a van). Transfers into sellable locations now follow the sale lot rules.
+- The rep app showed expired quantities as sellable; it now shows only valid stock.
+- Demo stock used fixed January production dates and had expired by the time of testing.
+
 ## 0.3.0 — 2026-11-11 — Phase 3: manufacturing & quality
 ### Added
 - Migration 006: versioned formulas (approval with SoD, frozen once approved, one approved version per product, approved substitutes), work centers, production orders and entries, quality specs with HACCP CCPs, checks and results (append-only), non-conformance with CAPA, recalls, lot hold.

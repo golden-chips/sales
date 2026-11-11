@@ -14,6 +14,8 @@ import { createStockDoc, postStockDoc } from "../src/modules/erp/inventory.servi
 import { syncSystemRoles } from "../src/modules/iam/roles.service.js";
 import { approveBom, createBom } from "../src/modules/mfg/mfg.service.js";
 import { replaceSpecs } from "../src/modules/mfg/quality.service.js";
+import { createRep, setRoute } from "../src/modules/field/field.service.js";
+import { roleIdByCode } from "../src/modules/iam/roles.service.js";
 
 const env = (k: string) => { const v = process.env[k]; if (!v) throw new Error(`${k} is required for seeding`); return v; };
 
@@ -117,10 +119,12 @@ async function main() {
       await syncSystemRoles(db, id);
       const seedCtx = { ...ctx, enforceSod: false }; // seeding only: the system posts its own opening document
       const y0 = `${y}-01-01`;
+      // production dates relative to today so DEMO stock is within shelf life whenever the seed runs
+      const daysAgo = (n: number) => new Date(Date.now() - n * 86400_000).toISOString().slice(0, 10);
       const op = await createStockDoc(db, seedCtx, { companyId: r.companyId, reason: "opening", warehouseId: wh["DEMO-FG"], docDate: y0, notes: "DEMO رصيد افتتاحي", lines: [
-        { itemId: chips, qtyDelta: "480", unitCost: "0.82", lotNo: "DEMO-L01", productionDate: y0 },
-        { itemId: chips, qtyDelta: "240", unitCost: "0.90", lotNo: "DEMO-L02", productionDate: `${y}-01-15` },
-        { itemId: corn, qtyDelta: "360", unitCost: "0.45", lotNo: "DEMO-L03", productionDate: y0 } ] });
+        { itemId: chips, qtyDelta: "480", unitCost: "0.82", lotNo: "DEMO-L01", productionDate: daysAgo(40) },
+        { itemId: chips, qtyDelta: "240", unitCost: "0.90", lotNo: "DEMO-L02", productionDate: daysAgo(10) },
+        { itemId: corn, qtyDelta: "360", unitCost: "0.45", lotNo: "DEMO-L03", productionDate: daysAgo(20) } ] });
       await postStockDoc(db, seedCtx, op.id);
       const op2 = await createStockDoc(db, seedCtx, { companyId: r.companyId, reason: "opening", warehouseId: wh["DEMO-RM"], docDate: y0, notes: "DEMO رصيد افتتاحي خامات",
         lines: [{ itemId: oil, qtyDelta: "500", unitCost: "4.2", lotNo: "DEMO-OIL-01", expiryDate: `${y + 1}-06-30` }] });
@@ -143,6 +147,22 @@ async function main() {
       await replaceSpecs(db, seedCtx, chips, "final", [
         { parameter: "درجة حرارة القلي", unit: "°C", min: "170", max: "180", isCcp: true },
         { parameter: "الرطوبة", unit: "%", max: "2" }, { parameter: "نسبة الملح", unit: "%", min: "1", max: "2" }, { parameter: "سلامة التغليف" } ]);
+
+      // DEMO field sales: a rep user, a loaded van, a territory and a route on every weekday
+      const repPw = process.env.DEMO_REP_PASSWORD || demoPw;
+      const repUser = (await db.query("INSERT INTO users (tenant_id, email, full_name, password_hash, locale) VALUES ($1,'rep@demo-foods.example','DEMO مندوب 1',$2,'ar') RETURNING id",
+        [id, await hashPassword(repPw)])).rows[0].id;
+      await db.query("INSERT INTO user_roles (tenant_id, user_id, role_id) VALUES ($1,$2,$3)", [id, repUser, await roleIdByCode(db, "sales_rep")]);
+      const van = (await db.query("INSERT INTO warehouses (tenant_id, branch_id, code, name_ar, kind, is_sellable) VALUES ($1,$2,'DEMO-VAN1','DEMO سيارة توزيع 1','van',true) RETURNING id", [id, branch])).rows[0].id;
+      const terr = (await db.query("INSERT INTO territories (tenant_id, company_id, code, name_ar) VALUES ($1,$2,'DEMO-TRP','DEMO طرابلس — وسط') RETURNING id", [id, r.companyId])).rows[0].id;
+      const rep = await createRep(db, seedCtx, { companyId: r.companyId, userId: repUser, code: "DEMO-R1", vanWarehouseId: van, territoryId: terr, commissionType: "flat", commissionRate: "1.5", maxDiscountPct: "5" });
+      const custs = (await db.query("SELECT id FROM parties WHERE kind = 'customer' ORDER BY code")).rows.map((x) => x.id);
+      await db.query("UPDATE parties SET phone = '+218910000000' WHERE code = 'DEMO-C001'");
+      for (let wd = 0; wd < 7; wd++) await setRoute(db, seedCtx, rep.id, { weekday: wd, name: "DEMO مسار يومي", customerIds: custs });
+      const load = await createStockDoc(db, seedCtx, { companyId: r.companyId, reason: "transfer", warehouseId: wh["DEMO-FG"], toWarehouseId: van, docDate: new Date().toISOString().slice(0, 10),
+        notes: "DEMO تحميل السيارة", lines: [{ itemId: chips, qtyDelta: "240" }, { itemId: corn, qtyDelta: "144" }] });
+      await postStockDoc(db, seedCtx, load.id);
+      console.log(`demo rep: rep@demo-foods.example / ${repPw}`);
     });
     console.log(`demo-foods provisioned (is_demo). Owner: owner@demo-foods.example / ${demoPw}  (shown once — store it in your password manager)`);
   } else console.log("demo-foods exists");

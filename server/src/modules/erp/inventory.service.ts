@@ -137,7 +137,8 @@ export async function postStockDoc(db: Db, u: UserCtx, id: string) {
     const invRole = inventoryRole(from.kind, l.kind);
     if (d.reason === "transfer" || d.reason === "quarantine_release") {
       const out = await stockOut(db, u, { ...src, sourceLineId: l.id, warehouseId: from.id, itemId: l.item_id, lotId: l.lot_id, qty, trackLots: l.track_lots, itemCode: l.code,
-        forSale: d.reason === "quarantine_release" });
+        // expired or held lots may never move INTO a sellable location (van, finished goods): same rule as a sale
+        forSale: d.reason === "quarantine_release" || !!to?.is_sellable });
       if (d.reason === "quarantine_release") {
         // food safety: a tracked lot leaves quarantine only if its latest quality check passed
         for (const a of out.allocations) {

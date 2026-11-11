@@ -22,6 +22,8 @@ import SalesInvoices, { ArAging, Receipts, SalesReturns } from "./pages/erp/Sale
 import PurchaseReceipts, { StockDocuments, SupplierInvoices } from "./pages/erp/Purchasing";
 import { Formulas, Mrp, ProductionOrders } from "./pages/mfg/Manufacturing";
 import { NonConformances, QualityChecks, QualitySpecs, TraceRecall } from "./pages/mfg/Quality";
+import RepApp from "./pages/field/RepApp";
+import { Commissions, Notifications, Performance, Reps, Settlements } from "./pages/field/Distribution";
 
 function ThemeToggle() {
   const { t } = useI18n();
@@ -65,12 +67,19 @@ function Shell() {
         <div className="brand"><div className="logo">G</div><div><b>{t.app}</b><small>{pick(me.tenant.legal_name, me.tenant.name_en)}</small></div></div>
         <nav className="nav">
           {L("/", t.dashboard)}
+          {L("/field", tt("يومي (تطبيق المندوب)", "My day (rep app)"), me.modules.includes("distribution") && can("distribution.field.app"))}
           {me.modules.includes("sales") && <div className="nav-group">{tt("المبيعات", "Sales")}</div>}
           {L("/sales/invoices", tt("فواتير المبيعات", "Sales invoices"), me.modules.includes("sales") && can("sales.invoices.view"))}
           {L("/sales/returns", tt("مرتجعات المبيعات", "Sales returns"), me.modules.includes("sales") && can("sales.invoices.view"))}
           {L("/sales/receipts", tt("سندات القبض", "Customer receipts"), me.modules.includes("sales") && can("sales.invoices.view"))}
           {L("/customers", tt("العملاء", "Customers"), me.modules.includes("sales") && can("sales.customers.view"))}
           {L("/sales/aging", tt("أعمار الديون", "AR aging"), me.modules.includes("sales") && can("sales.reports.view"))}
+          {me.modules.includes("distribution") && can("distribution.reps.view") && <div className="nav-group">{tt("التوزيع", "Distribution")}</div>}
+          {L("/distribution/reps", tt("المناديب والمسارات", "Reps & routes"), me.modules.includes("distribution") && can("distribution.reps.view"))}
+          {L("/distribution/performance", tt("الأداء والأهداف", "Performance"), me.modules.includes("distribution") && can("distribution.reps.view"))}
+          {L("/distribution/settlements", tt("التسويات والعهد", "Settlements & cash"), me.modules.includes("distribution") && can("distribution.reps.view"))}
+          {L("/distribution/commissions", tt("العمولات", "Commissions"), me.modules.includes("distribution") && can("distribution.reps.view"))}
+          {L("/distribution/notifications", tt("رسائل العملاء", "Customer messages"), me.modules.includes("distribution") && can("distribution.notifications.view"))}
           {me.modules.includes("purchasing") && <div className="nav-group">{tt("المشتريات", "Purchasing")}</div>}
           {L("/purchasing/receipts", tt("أذونات الاستلام", "Goods receipts"), me.modules.includes("purchasing") && can("purchasing.receipts.view"))}
           {L("/purchasing/invoices", tt("فواتير الموردين", "Supplier invoices"), me.modules.includes("purchasing") && can("purchasing.receipts.view"))}
@@ -141,6 +150,12 @@ function Shell() {
             <Route path="/sales/aging" element={<ArAging />} />
             <Route path="/purchasing/receipts" element={<PurchaseReceipts />} />
             <Route path="/purchasing/invoices" element={<SupplierInvoices />} />
+            <Route path="/field" element={<RepApp />} />
+            <Route path="/distribution/reps" element={<Reps />} />
+            <Route path="/distribution/performance" element={<Performance />} />
+            <Route path="/distribution/settlements" element={<Settlements />} />
+            <Route path="/distribution/commissions" element={<Commissions />} />
+            <Route path="/distribution/notifications" element={<Notifications />} />
             <Route path="/manufacturing/orders" element={<ProductionOrders />} />
             <Route path="/manufacturing/boms" element={<Formulas />} />
             <Route path="/manufacturing/mrp" element={<Mrp />} />

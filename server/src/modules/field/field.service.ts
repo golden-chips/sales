@@ -83,9 +83,13 @@ export async function myDay(db: Db, rep: any, date: string) {
        FROM routes r JOIN route_stops s ON s.route_id = r.id JOIN parties p ON p.id = s.customer_id
       WHERE r.rep_id = $2 AND r.weekday = $1 ORDER BY s.seq`, [weekday, rep.id, date])).rows;
   const van = (await db.query(
-    `SELECT i.id, i.code, i.name_ar, i.sales_price, u.code AS uom, b.qty,
+    `SELECT i.id, i.code, i.name_ar, i.sales_price, u.code AS uom,
+            -- sellable = not expired, not on hold (what the rep can actually sell today)
+            CASE WHEN i.track_lots THEN coalesce((SELECT sum(lb.qty) FROM lot_balances lb JOIN lots l ON l.id = lb.lot_id WHERE lb.warehouse_id = b.warehouse_id AND l.item_id = i.id
+                   AND NOT l.on_hold AND (l.expiry_date IS NULL OR l.expiry_date >= $2::date)), 0) ELSE b.qty END AS qty,
+            b.qty AS book_qty,
             coalesce((SELECT json_agg(json_build_object('uomId', iu.uom_id, 'code', u2.code, 'factor', iu.factor)) FROM item_uoms iu JOIN uoms u2 ON u2.id = iu.uom_id WHERE iu.item_id = i.id), '[]') AS units
-       FROM stock_balances b JOIN items i ON i.id = b.item_id JOIN uoms u ON u.id = i.base_uom_id WHERE b.warehouse_id = $1 AND b.qty > 0 ORDER BY i.code`, [rep.van_warehouse_id])).rows;
+       FROM stock_balances b JOIN items i ON i.id = b.item_id JOIN uoms u ON u.id = i.base_uom_id WHERE b.warehouse_id = $1 AND b.qty > 0 ORDER BY i.code`, [rep.van_warehouse_id, date])).rows;
   const today = await one(db, `SELECT
        (SELECT coalesce(sum(total),0) FROM sales_invoices WHERE rep_id = $1 AND status = 'posted' AND invoice_date = $2) AS sales,
        (SELECT count(*) FROM sales_invoices WHERE rep_id = $1 AND status = 'posted' AND invoice_date = $2) AS invoices,

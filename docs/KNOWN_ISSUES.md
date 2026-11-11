@@ -13,7 +13,7 @@
 | K9 | Info | Plan prices are 0 placeholders | Owner decision D4 |
 | K10 | Info | Modules 2b–6 not built; the UI shows only implemented screens and an honest roadmap | Per implementation plan |
 | K11 | Info | Browser E2E is a manual Playwright script, not yet in CI | Add Playwright job |
-| K12 | Medium | **One unexplained intermittent test failure** (accounting suite: a journal post returned non-200 once in 9 full runs; never reproduced). An assertion now prints the API error if it recurs | Investigate on next occurrence |
+| K12 | Medium | **Unexplained intermittent test failure, still open.** Seen 3 times (always the same 2 accounting tests together: a direct `UPDATE` on a posted entry's lines was not rejected, so the trial balance then failed). Each time it happened on the first full run right after code edits + a dev-DB reset; 10+ subsequent runs were clean. Posting itself succeeded (asserted). A diagnostic probe now logs row count, trigger state and DB when it recurs. Not observed outside the test harness | Analyse the probe output on next occurrence |
 | K13 | Medium | Sales orders & stock reservation, quotations, purchase requisitions/POs/RFQ/approvals not implemented | Phase 2b remainder |
 | K14 | Medium | Supplier invoice must not exceed received value — purchase price variance and landed costs not supported | Phase 2b remainder |
 | K15 | Medium | Return on a fully paid credit invoice is rejected (cash refund flow missing); debit/credit notes missing | Phase 2b remainder |
@@ -21,6 +21,9 @@
 | K17 | Low | Some UI inputs (supplier invoice number, unit codes, recall reason, work center) use browser `prompt()` | Replace with modals |
 | K18 | Medium | Capacity planning, line scheduling, shifts, downtime/OEE, by-products not implemented | Phase 3 remainder |
 | K19 | Medium | Weighted average is per warehouse+item, so all lots of an item share one cost (lot-level actual cost not supported) | Option for lot costing later if required |
-| K20 | Low | Recall does not yet notify customers automatically (list is produced; WhatsApp integration in Phase 4) | Phase 4 |
+| K20 | Medium | Recall notices are queued in the outbox but **not sent**: the WhatsApp sender (company's Meta account) is not connected yet | Connect sender worker |
+| K21 | Medium | Existing Expo rep app not yet switched to the new API (adapter plan in FIELD_SALES_DISTRIBUTION.md); the web rep app is the tested alternative | Phase 4 remainder |
+| K22 | Low | On phone width the top bar stacks its controls and takes too much height | UI polish |
+| K23 | Low | Settlement overage on a lot-tracked item is put on the most recently moved lot in the van | Let the supervisor pick the lot |
 
 Legacy systems findings (V1–V10, H1–H6) are in `PHASE0_DISCOVERY_AUDIT.md`; they live in the `van-sales-app` repository and were **not modified** in this phase.

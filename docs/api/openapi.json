@@ -2441,6 +2441,380 @@
           }
         }
       }
+    },
+    "/api/v1/field/my-day": {
+      "get": {
+        "summary": "Today's route, van stock, today's totals and cash custody (own data only)",
+        "tags": [
+          "Field sales (rep app)"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/field/sync": {
+      "post": {
+        "summary": "Offline sync: batch of field operations; each op is atomic and idempotent by clientId",
+        "tags": [
+          "Field sales (rep app)"
+        ],
+        "description": "Every op runs in its own transaction. Re-sending an op with the same clientId returns the original result (`replayed: true`) and never duplicates an invoice or receipt. Failed ops are not recorded and can be retried after fixing.",
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/field/load-requests": {
+      "post": {
+        "summary": "Request a van load (draft transfer; the warehouse posts it)",
+        "tags": [
+          "Field sales (rep app)"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/field/handovers": {
+      "post": {
+        "summary": "Declare a cash handover from custody (a cashier confirms)",
+        "tags": [
+          "Field sales (rep app)"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/field/settlements": {
+      "post": {
+        "summary": "Submit end-of-day van count (a supervisor approves)",
+        "tags": [
+          "Field sales (rep app)"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/reps": {
+      "get": {
+        "summary": "Reps with van, territory, commission and custody",
+        "tags": [
+          "Distribution"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Register a rep (user with sales_rep role + van warehouse)",
+        "tags": [
+          "Distribution"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/reps/{id}/routes": {
+      "put": {
+        "summary": "Set the route of a weekday (ordered customers)",
+        "tags": [
+          "Distribution"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/reps/{id}/targets": {
+      "put": {
+        "summary": "Set monthly targets",
+        "tags": [
+          "Distribution"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/territories": {
+      "get": {
+        "summary": "Territories",
+        "tags": [
+          "Distribution"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create territory",
+        "tags": [
+          "Distribution"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/customers/{id}/territory": {
+      "put": {
+        "summary": "Assign a customer to a territory (and optional location)",
+        "tags": [
+          "Distribution"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/settlements": {
+      "get": {
+        "summary": "Day settlements",
+        "tags": [
+          "Distribution"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/settlements/{id}": {
+      "get": {
+        "summary": "Settlement with counted vs book quantities",
+        "tags": [
+          "Distribution"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/settlements/{id}/approve": {
+      "post": {
+        "summary": "Approve: shortages charged to the rep, overages to inventory adjustment",
+        "tags": [
+          "Distribution"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/handovers": {
+      "get": {
+        "summary": "Cash handovers",
+        "tags": [
+          "Distribution"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/handovers/{id}/confirm": {
+      "post": {
+        "summary": "Cashier confirms the counted cash (shortage charged to the rep)",
+        "tags": [
+          "Distribution"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/performance": {
+      "get": {
+        "summary": "Rep performance vs targets for a month",
+        "tags": [
+          "Distribution"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/commission-runs": {
+      "get": {
+        "summary": "Commission runs",
+        "tags": [
+          "Distribution"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Calculate commissions for a month (on collected money)",
+        "tags": [
+          "Distribution"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/commission-runs/{id}": {
+      "get": {
+        "summary": "Commission run detail",
+        "tags": [
+          "Distribution"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/commission-runs/{id}/post": {
+      "post": {
+        "summary": "Post commissions (Dr commission expense / Cr commissions payable; SoD)",
+        "tags": [
+          "Distribution"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/distribution/notifications": {
+      "get": {
+        "summary": "Outbound customer notifications (e.g. recall notices)",
+        "tags": [
+          "Distribution"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
     }
   },
   "servers": [

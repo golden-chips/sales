@@ -64,6 +64,17 @@ describe("field sales & distribution: load → offline sync → custody → day 
     ok(await api("PUT", `/api/v1/distribution/reps/${rep.id}/targets`, { period, salesTarget: "174", collectionTarget: "100", visitsTarget: 4 }, as(S)), 200);
   });
 
+  it("expired stock can never be loaded into a van (a sellable location)", async () => {
+    const stale = ok(await api("POST", "/api/v1/items", { companyId: T.companyId, code: "STALE", nameAr: "صنف منتهي (اختبار)", kind: "finished",
+      baseUomId: (await api("GET", "/api/v1/uoms", undefined, as(T))).body[0].id, trackLots: true, salesPrice: "1" }, as(T))).id;
+    const op = ok(await api("POST", "/api/v1/inventory/documents", { companyId: T.companyId, reason: "opening", warehouseId: wh.MAIN, docDate: `${Y}-01-02`,
+      lines: [{ itemId: stale, qtyDelta: "10", unitCost: "0.5", lotNo: "OLD", expiryDate: `${Number(Y) - 1}-12-31` }] }, as(T)));
+    ok(await api("POST", `/api/v1/inventory/documents/${op.id}/post`, {}, as(W)), 200);
+    const d = ok(await api("POST", "/api/v1/field/load-requests", { fromWarehouseId: wh.MAIN, docDate: today, lines: [{ itemId: stale, qty: "10" }] }, as(R)));
+    expect((await api("POST", `/api/v1/inventory/documents/${d.id}/post`, {}, as(W))).body.error.code).toBe("INSUFFICIENT_LOT_STOCK");
+    await api("DELETE", `/api/v1/inventory/documents/${d.id}`, undefined, as(R));
+  });
+
   it("van load: the rep requests, the warehouse posts (rep cannot post)", async () => {
     const d = ok(await api("POST", "/api/v1/field/load-requests", { fromWarehouseId: wh.MAIN, docDate: today, lines: [{ itemId: chips, qty: "240" }] }, as(R)));
     expect((await api("POST", `/api/v1/inventory/documents/${d.id}/post`, {}, as(R))).status).toBe(403);
