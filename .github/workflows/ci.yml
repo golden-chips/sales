@@ -1,0 +1,40 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: golden_owner
+          POSTGRES_PASSWORD: ci_owner_pw
+          POSTGRES_DB: golden_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U golden_owner" --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults: { run: { working-directory: server } }
+    env:
+      TEST_DATABASE_ADMIN_URL: postgres://golden_owner:ci_owner_pw@localhost:5432/golden_test
+      TEST_DATABASE_URL: postgres://golden_app:ci_app_pw@localhost:5432/golden_test
+      TEST_APP_DB_PASSWORD: ci_app_pw
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: server/package-lock.json }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults: { run: { working-directory: web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build

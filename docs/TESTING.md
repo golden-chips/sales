@@ -1,0 +1,92 @@
+# Testing Strategy & Results
+
+## Strategy
+
+| Level | Tooling | Status |
+|---|---|---|
+| Unit | Vitest | Pure helpers are covered through integration tests for now; dedicated unit tests come with Phase 2b costing logic |
+| **Integration (API + DB)** | Vitest + Fastify `inject` + **real PostgreSQL 16**, connecting as the non-superuser `golden_app` role | **52 tests, all passing** |
+| Security | RLS isolation, forged tokens, privilege escalation, SoD, lockout, refresh-token reuse, MFA | Included in the 52 |
+| Accounting | balance, immutability (also by bypassing the service layer), reversal, closed periods, FX rounding, idempotency, trial-balance/ledger/statement reconciliation | Included |
+| SaaS | plan limits, downgrade guard, suspend/reactivate, trial → past_due → suspended sweep | Included |
+| End-to-end (browser) | Playwright script driving the real web app + API (owner login → create accountant → create entry → SoD block → accountant posts → trial balance → ledger → English/dark → platform console → mobile viewport) | Run manually (see results); to be added to CI |
+| Performance | k6 / autocannon | **Not run yet** — planned before go-live with targets in `IMPLEMENTATION_PLAN.md` |
+| Regression | Full suite on every push (`.github/workflows/ci.yml`) | CI workflow added; first CI run happens on push |
+
+Rules: tests never use production data (each test provisions its own throw-away tenant); the test database is rebuilt from migrations on every run (`scripts/reset-db.ts` refuses to touch a database whose name does not end in `_test`/`_dev`).
+
+Run locally:
+```bash
+cd server && npm test        # needs PostgreSQL; see INSTALLATION.md
+```
+
+## Results — 2026-11-11 (local run, PostgreSQL 16.15, Node 22.23)
+
+```
+✓ test/rbac-saas.test.ts > RBAC > seeds all 16 tenant system roles
+✓ test/rbac-saas.test.ts > RBAC > read-only user can view but not create
+✓ test/rbac-saas.test.ts > RBAC > permission revocation is effective immediately (no re-login)
+✓ test/rbac-saas.test.ts > RBAC > deactivated user is rejected on next request
+✓ test/rbac-saas.test.ts > RBAC > prevents privilege escalation: a company admin cannot assign finance roles they don't hold
+✓ test/rbac-saas.test.ts > RBAC > branch-scoped user sees only their branch
+✓ test/rbac-saas.test.ts > RBAC > module not in plan returns 402
+✓ test/rbac-saas.test.ts > RBAC > quarantine warehouses can never be sellable (DB constraint)
+✓ test/rbac-saas.test.ts > SaaS plans, limits and lifecycle > enforces the plan user limit
+✓ test/rbac-saas.test.ts > SaaS plans, limits and lifecycle > enforces branch limit
+✓ test/rbac-saas.test.ts > SaaS plans, limits and lifecycle > blocks a downgrade that exceeds the target plan's limits, allows upgrade
+✓ test/rbac-saas.test.ts > SaaS plans, limits and lifecycle > suspension blocks login and API immediately; reactivation restores
+✓ test/rbac-saas.test.ts > SaaS plans, limits and lifecycle > lifecycle sweep: trial end → past_due (still usable) → suspended after grace
+✓ test/rbac-saas.test.ts > SaaS plans, limits and lifecycle > tenant sees its own subscription, limits and usage
+✓ test/rbac-saas.test.ts > SaaS plans, limits and lifecycle > tenant code must be unique
+✓ test/auth.test.ts > authentication > rejects wrong password and unknown tenant with the same generic error
+✓ test/auth.test.ts > authentication > records login attempts
+✓ test/auth.test.ts > authentication > locks the account after max failed logins, admin can unlock
+✓ test/auth.test.ts > authentication > rotates refresh tokens and revokes the family on reuse
+✓ test/auth.test.ts > authentication > MFA: enrol, then login requires a valid TOTP
+✓ test/auth.test.ts > authentication > enforces password policy on change
+✓ test/auth.test.ts > authentication > me returns permissions and plan modules
+✓ test/auth.test.ts > authentication > rejects missing / garbage tokens
+✓ test/accounting.test.ts > general ledger > seeded CoA has headers, leaves, contra accounts and roles
+✓ test/accounting.test.ts > general ledger > fiscal year generates 12 contiguous monthly periods
+✓ test/accounting.test.ts > general ledger > overlapping fiscal year is rejected
+✓ test/accounting.test.ts > general ledger > rejects a line with both debit and credit
+✓ test/accounting.test.ts > general ledger > an unbalanced draft can be saved but never posted
+✓ test/accounting.test.ts > general ledger > database rejects posting an unbalanced entry even if the service check is bypassed
+✓ test/accounting.test.ts > general ledger > segregation of duties: creator cannot post own entry; another accountant can
+✓ test/accounting.test.ts > general ledger > posted entries and their lines are immutable at the database level
+✓ test/accounting.test.ts > general ledger > reversal creates a mirrored posted entry and nets to zero; cannot reverse twice
+✓ test/accounting.test.ts > general ledger > accountant (without reverse permission) cannot reverse
+✓ test/accounting.test.ts > general ledger > header (non-postable) accounts cannot be posted to
+✓ test/accounting.test.ts > general ledger > period close is blocked by drafts; posting into a closed period is rejected
+✓ test/accounting.test.ts > general ledger > foreign currency: USD entry converted to LYD at 3 decimals using the dated rate
+✓ test/accounting.test.ts > general ledger > Idempotency-Key replays the same response and rejects a different payload
+✓ test/accounting.test.ts > general ledger > source documents post exactly once (integration contract)
+✓ test/accounting.test.ts > general ledger > trial balance balances, ledger drills down, statements reconcile
+✓ test/accounting.test.ts > general ledger > account with a balance cannot be deactivated
+✓ test/accounting.test.ts > general ledger > every posting is in the audit trail, and the audit log is append-only
+✓ test/tenant-isolation.test.ts > tenant isolation (RLS) > runtime DB role cannot bypass RLS
+✓ test/tenant-isolation.test.ts > tenant isolation (RLS) > queries without tenant context see no tenant rows
+✓ test/tenant-isolation.test.ts > tenant isolation (RLS) > a tenant context sees only its own rows even with no WHERE clause
+✓ test/tenant-isolation.test.ts > tenant isolation (RLS) > cannot insert rows into another tenant
+✓ test/tenant-isolation.test.ts > tenant isolation (RLS) > cannot reference another tenant's records (composite FK + RLS)
+✓ test/tenant-isolation.test.ts > tenant isolation (RLS) > API: tenant A cannot read tenant B's company by id or list
+✓ test/tenant-isolation.test.ts > tenant isolation (RLS) > API: tenant A cannot create a branch under tenant B's company
+✓ test/tenant-isolation.test.ts > tenant isolation (RLS) > a token from tenant A forged with tenant B id is rejected (signature)
+✓ test/tenant-isolation.test.ts > tenant isolation (RLS) > platform context cannot read tenant business data, only metadata/usage
+✓ test/tenant-isolation.test.ts > tenant isolation (RLS) > tenant cannot call usage function for another tenant
+✓ test/tenant-isolation.test.ts > tenant isolation (RLS) > tenant tokens cannot access platform endpoints and vice versa
+Test Files  4 passed (4)
+     Tests  52 passed (52)
+  Duration  31.69s
+```
+
+Additional checks run in the same session:
+* `tsc --noEmit` — server and web: 0 errors.
+* `vite build` — web: success (235 kB JS, 72 kB gzip).
+* Browser E2E journey — passed. The only browser console entry was the **expected** `403` when the owner tried to post their own entry (segregation of duties).
+* Seed script run twice — second run created nothing (idempotent).
+
+### Defects found by these tests and fixed during Phase 1
+1. Three SQL parameter-type inference errors (lockout counter, reversal source id, period status) → 500 errors. Fixed with explicit casts.
+2. **Design flaw:** the `*.view` wildcard granted the sensitive `core.audit.view` permission to the Read-Only role. Fixed: cross-module view wildcards never include sensitive permissions.
+3. Test-data mistakes (one-character names rejected by validation; a wrong expected FX value) — tests corrected, product behaviour was right.

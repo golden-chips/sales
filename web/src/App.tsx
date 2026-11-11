@@ -1,0 +1,117 @@
+import { useEffect, useState } from "react";
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { useI18n } from "./i18n";
+import { useSession } from "./session";
+import { Loading } from "./ui";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import Users from "./pages/Users";
+import Roles from "./pages/Roles";
+import Organization from "./pages/Organization";
+import Accounts from "./pages/Accounts";
+import Journal from "./pages/Journal";
+import TrialBalance from "./pages/TrialBalance";
+import Periods from "./pages/Periods";
+import AuditLog from "./pages/AuditLog";
+import Subscription from "./pages/Subscription";
+import PlatformApp from "./platform/PlatformApp";
+
+function ThemeToggle() {
+  const { t } = useI18n();
+  const [theme, setTheme] = useState<string>(() => { try { return localStorage.getItem("theme") || ""; } catch { return ""; } });
+  useEffect(() => {
+    if (theme) document.documentElement.setAttribute("data-theme", theme); else document.documentElement.removeAttribute("data-theme");
+    try { localStorage.setItem("theme", theme); } catch { /* not persisted */ }
+  }, [theme]);
+  const dark = theme === "dark" || (!theme && matchMedia("(prefers-color-scheme: dark)").matches);
+  return <button className="btn sm" onClick={() => setTheme(dark ? "light" : "dark")} title={t.darkMode}>{dark ? "☀" : "☾"}</button>;
+}
+
+export function TopControls() {
+  const { t, lang, setLang } = useI18n();
+  return <><ThemeToggle /><button className="btn sm" onClick={() => setLang(lang === "ar" ? "en" : "ar")}>{t.language}</button></>;
+}
+
+function Shell() {
+  const { t, pick } = useI18n();
+  const { me, can, signOut, companyId, setCompanyId } = useSession();
+  const [open, setOpen] = useState(false);
+  const loc = useLocation();
+  const nav = useNavigate();
+  useEffect(() => setOpen(false), [loc.pathname]);
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.toLowerCase() === "n" && can("accounting.journal.create")) { e.preventDefault(); nav("/journal?new=1"); }
+      if (e.key === "/") { const s = document.querySelector<HTMLInputElement>("input[type=search]"); if (s) { e.preventDefault(); s.focus(); } }
+    };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [can, nav]);
+  if (!me) return null;
+  const hasAcc = me.modules.includes("accounting");
+  const L = (to: string, label: string, show = true) => show && <NavLink to={to} end={to === "/"}>{label}</NavLink>;
+  return (
+    <div className="layout">
+      <aside className={`sidebar ${open ? "open" : ""}`}>
+        <div className="brand"><div className="logo">G</div><div><b>{t.app}</b><small>{pick(me.tenant.legal_name, me.tenant.name_en)}</small></div></div>
+        <nav className="nav">
+          {L("/", t.dashboard)}
+          {hasAcc && <div className="nav-group">{t.groupFinance}</div>}
+          {L("/accounts", t.coa, hasAcc && can("accounting.accounts.view"))}
+          {L("/journal", t.journal, hasAcc && can("accounting.journal.view"))}
+          {L("/trial-balance", t.trialBalance, hasAcc && can("accounting.reports.view"))}
+          {L("/periods", t.periods, hasAcc && can("accounting.journal.view"))}
+          <div className="nav-group">{t.groupAdmin}</div>
+          {L("/users", t.users, can("core.users.view"))}
+          {L("/roles", t.roles, can("core.roles.view"))}
+          {L("/organization", t.organization, can("core.org.view"))}
+          {L("/audit", t.audit, can("core.audit.view"))}
+          {L("/subscription", t.subscription, can("core.subscription.view"))}
+        </nav>
+      </aside>
+      <div className="main">
+        <div className="topbar">
+          <div className="row">
+            <button className="btn sm menu-btn" onClick={() => setOpen(!open)} aria-label="menu">☰</button>
+            {me.tenant.is_demo && <span className="badge demo">DEMO</span>}
+            {me.companies.length > 0 && (
+              <select value={companyId ?? ""} onChange={(e) => setCompanyId(e.target.value)} style={{ width: "auto" }} aria-label={t.company}>
+                {me.companies.map((c) => <option key={c.id} value={c.id}>{c.code} — {pick(c.name_ar, c.name_en)}</option>)}
+              </select>
+            )}
+          </div>
+          <div className="row">
+            <span style={{ color: "var(--muted)" }}>{me.user.full_name}</span>
+            <TopControls />
+            <button className="btn sm" onClick={signOut}>{t.logout}</button>
+          </div>
+        </div>
+        <div className="content">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/accounts" element={<Accounts />} />
+            <Route path="/journal" element={<Journal />} />
+            <Route path="/trial-balance" element={<TrialBalance />} />
+            <Route path="/periods" element={<Periods />} />
+            <Route path="/users" element={<Users />} />
+            <Route path="/roles" element={<Roles />} />
+            <Route path="/organization" element={<Organization />} />
+            <Route path="/audit" element={<AuditLog />} />
+            <Route path="/subscription" element={<Subscription />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const { me, loading } = useSession();
+  const loc = useLocation();
+  if (loc.pathname.startsWith("/platform")) return <PlatformApp />;
+  if (loading) return <div className="content"><Loading /></div>;
+  return me ? <Shell /> : <Login />;
+}
