@@ -12,6 +12,8 @@ import { loadUserCtx } from "../src/core/auth.js";
 import { createFiscalYear, seedChartOfAccounts, createDraft, postEntry, postFromSource } from "../src/modules/accounting/accounting.service.js";
 import { createStockDoc, postStockDoc } from "../src/modules/erp/inventory.service.js";
 import { syncSystemRoles } from "../src/modules/iam/roles.service.js";
+import { approveBom, createBom } from "../src/modules/mfg/mfg.service.js";
+import { replaceSpecs } from "../src/modules/mfg/quality.service.js";
 
 const env = (k: string) => { const v = process.env[k]; if (!v) throw new Error(`${k} is required for seeding`); return v; };
 
@@ -123,6 +125,24 @@ async function main() {
       const op2 = await createStockDoc(db, seedCtx, { companyId: r.companyId, reason: "opening", warehouseId: wh["DEMO-RM"], docDate: y0, notes: "DEMO رصيد افتتاحي خامات",
         lines: [{ itemId: oil, qtyDelta: "500", unitCost: "4.2", lotNo: "DEMO-OIL-01", expiryDate: `${y + 1}-06-30` }] });
       await postStockDoc(db, seedCtx, op2.id);
+
+      // DEMO manufacturing: raw materials, packaging, an approved formula, a line, HACCP specs
+      const potato = await item("DEMO-POTATO", "DEMO بطاطس طازجة", "raw", "KG", null);
+      const salt = await item("DEMO-SALT", "DEMO ملح طعام", "raw", "KG", null);
+      const film = (await db.query(`INSERT INTO items (tenant_id, company_id, code, name_ar, kind, base_uom_id, track_lots, is_demo) VALUES ($1,$2,'DEMO-FILM40','DEMO فيلم تغليف 40غ','packaging',$3,false,true) RETURNING id`,
+        [id, r.companyId, u.BAG])).rows[0].id;
+      const op3 = await createStockDoc(db, seedCtx, { companyId: r.companyId, reason: "opening", warehouseId: wh["DEMO-RM"], docDate: y0, notes: "DEMO خامات ومواد تعبئة", lines: [
+        { itemId: potato, qtyDelta: "3000", unitCost: "0.55", lotNo: "DEMO-POT-01", expiryDate: `${y + 1}-03-31` },
+        { itemId: salt, qtyDelta: "200", unitCost: "0.9", lotNo: "DEMO-SALT-01", expiryDate: `${y + 2}-12-31` },
+        { itemId: film, qtyDelta: "20000", unitCost: "0.04" } ] });
+      await postStockDoc(db, seedCtx, op3.id);
+      await db.query("INSERT INTO work_centers (tenant_id, company_id, code, name_ar, capacity_per_hour, rate_per_hour) VALUES ($1,$2,'DEMO-LINE1','DEMO خط القلي 1',600,45)", [id, r.companyId]);
+      const bomDraft = await createBom(db, seedCtx, { companyId: r.companyId, itemId: chips, batchQty: "1000", stdScrapPct: "2", stdHours: "2", notes: "DEMO وصفة تجريبية — ليست وصفة حقيقية",
+        lines: [{ itemId: potato, qty: "160", scrapPct: "5" }, { itemId: oil, qty: "12" }, { itemId: salt, qty: "0.8" }, { itemId: film, qty: "1000", scrapPct: "2" }] });
+      await approveBom(db, seedCtx, bomDraft.id);
+      await replaceSpecs(db, seedCtx, chips, "final", [
+        { parameter: "درجة حرارة القلي", unit: "°C", min: "170", max: "180", isCcp: true },
+        { parameter: "الرطوبة", unit: "%", max: "2" }, { parameter: "نسبة الملح", unit: "%", min: "1", max: "2" }, { parameter: "سلامة التغليف" } ]);
     });
     console.log(`demo-foods provisioned (is_demo). Owner: owner@demo-foods.example / ${demoPw}  (shown once — store it in your password manager)`);
   } else console.log("demo-foods exists");

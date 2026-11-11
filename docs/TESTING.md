@@ -5,7 +5,7 @@
 | Level | Tooling | Status |
 |---|---|---|
 | Unit | Vitest | Pure helpers are covered through integration tests for now; dedicated unit tests come with Phase 2b costing logic |
-| **Integration (API + DB)** | Vitest + Fastify `inject` + **real PostgreSQL 16**, connecting as the non-superuser `golden_app` role | **69 tests, all passing** (see results) |
+| **Integration (API + DB)** | Vitest + Fastify `inject` + **real PostgreSQL 16**, connecting as the non-superuser `golden_app` role | **78 tests, all passing** (see results) |
 | Security | RLS isolation, forged tokens, privilege escalation, SoD, lockout, refresh-token reuse, MFA | Included in the 52 |
 | Accounting | balance, immutability (also by bypassing the service layer), reversal, closed periods, FX rounding, idempotency, trial-balance/ledger/statement reconciliation | Included |
 | SaaS | plan limits, downgrade guard, suspend/reactivate, trial → past_due → suspended sweep | Included |
@@ -99,3 +99,14 @@ Additional checks run in the same session:
 Full suite: **69 / 69 passed** in 7 consecutive full runs after the fixes. One earlier run had 2 failures in the accounting suite that never reproduced (see KNOWN_ISSUES K12).
 
 Browser E2E (demo-foods tenant): owner creates a user and drafts a credit invoice in cartons with a discount → sales manager posts it (journal JV created, lot shown, cost 40.640 = 48 × 0.8467 average) → AR aging → stock on hand ("reconciled with GL") → lot trace showing the customer. **This run uncovered the expired-lot defect**, fixed and covered by a test.
+
+
+## Results — Phase 3 (2026-11-11)
+
+`test/manufacturing.test.ts` — 9 tests: formula versioning, approval SoD, frozen approved lines, self-reference guard, standard cost roll-up (exact figure); order must output to quarantine, release freezes standard cost, expired material excluded from availability; issue via FEFO skipping the expired lot (verified by remaining lot quantities), non-formula item rejected, return at issue cost and over-return rejected, line hours absorbed; completion at actual cost (307.600), WIP cleared, operator cannot complete, cost report (yield 98%, potato std 164.64 vs actual 168, cost variance 30.652), completed order immutable; QC missing results, failed CCP → hold + NCR, release blocked, passing re-test does not lift the hold while NCR is open, close NCR + re-test → release; COGS of the released lot at LYD precision; genealogy backward to the supplier and forward to the customer; recall holds derived lots, blocks sale and production use, survives re-tests; MRP purchase suggestion; stock subledger = GL and trial balance balanced.
+
+Full suite: **78 / 78** in 3 consecutive runs.
+
+**Defect found by these tests:** the subledger/GL reconciliation failed by 0.0002 — stock values used 4 decimals while the GL uses the currency's 3. Fixed for all stock valuations.
+
+Browser E2E (demo-foods): formula with standard cost → create, release, issue 4 materials, record hours, complete order → cost actual vs standard → QC entry with frying temperature 192 °C (CCP) → failed, lot on hold, NCR opened → trace from potato lot to the finished lot. No console errors.

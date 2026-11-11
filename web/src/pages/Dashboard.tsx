@@ -8,8 +8,8 @@ const PHASES = [
   ["1", "SaaS foundation, IAM, audit", "الأساس: الاشتراكات والصلاحيات والتدقيق", "done"],
   ["2", "General ledger core", "نواة الأستاذ العام", "done"],
   ["2b", "Customers, suppliers, items, sales, purchasing, inventory", "العملاء والموردون والأصناف والمبيعات والمشتريات والمخزون", "done"],
-  ["3", "Manufacturing, quality, traceability", "التصنيع والجودة والتتبع", "next"],
-  ["4", "Field sales & distribution (van-sales integration)", "المناديب والتوزيع (دمج نظام المناديب)", "planned"],
+  ["3", "Manufacturing, quality, traceability", "التصنيع والجودة والتتبع", "done"],
+  ["4", "Field sales & distribution (van-sales integration)", "المناديب والتوزيع (دمج نظام المناديب)", "next"],
   ["5", "HRMS & payroll (attendance integration)", "الموارد البشرية والرواتب (دمج نظام الحضور)", "planned"],
   ["6", "CRM, POS, assets, documents, BI, AI", "CRM ونقاط البيع والأصول والمستندات والتقارير والذكاء", "planned"],
 ];

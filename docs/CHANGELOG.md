@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 — 2026-11-11 — Phase 3: manufacturing & quality
+### Added
+- Migration 006: versioned formulas (approval with SoD, frozen once approved, one approved version per product, approved substitutes), work centers, production orders and entries, quality specs with HACCP CCPs, checks and results (append-only), non-conformance with CAPA, recalls, lot hold.
+- Actual costing through WIP (issue / return / line hours / completion into quarantine), standard cost roll-up frozen at release, cost report (yield, quantity and cost variances), material availability, MRP with purchase suggestions.
+- Quality gates: system-judged results, failure → lot hold + NCR, release only after a passed check, recall holds every derived lot and survives re-tests; backward/forward genealogy through production.
+- Web: formulas, production orders (issue, hours, complete, cost), MRP, quality checks, specs & HACCP, non-conformance, trace & recall. Demo manufacturing data for `demo-foods`.
+- 9 new integration tests (78 total).
+### Fixed
+- Stock values were rounded to 4 decimals while the GL rounds to the currency (LYD = 3): the stock subledger could drift from the GL by fractions of a dirham. All stock values now use the currency's minor units.
+- Production managers could have recorded QC on their own output (removed: inspection belongs to Quality).
+
 ## 0.2.0 — 2026-11-11 — Phase 2b: core ERP
 ### Added
 - Migration 005: customers/suppliers, items with unit conversions, lots with production/expiry dates, perpetual inventory (weighted average, append-only stock ledger with per-line traceability, non-negative balances), sales invoices, sales returns, goods receipts, supplier invoices, payments with allocations, stock documents (opening, count, damage, transfer, quarantine release); 25 new permissions.

@@ -1933,6 +1933,19 @@
         }
       }
     },
+    "/api/v1/inventory/lots": {
+      "get": {
+        "summary": "Lots (search by number/item), with hold status, expiry and on-hand quantity",
+        "tags": [
+          "Reports"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/v1/inventory/valuation-check": {
       "get": {
         "summary": "Reconcile stock subledger value with GL inventory accounts",
@@ -1987,6 +2000,440 @@
         "summary": "Sales by item and by customer: quantity, net revenue, cost, gross margin (net of returns)",
         "tags": [
           "Reports"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/work-centers": {
+      "get": {
+        "summary": "Production lines / work centers",
+        "tags": [
+          "Manufacturing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create work center (capacity, conversion rate per hour)",
+        "tags": [
+          "Manufacturing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/boms": {
+      "get": {
+        "summary": "Formulas / BOMs (all versions)",
+        "tags": [
+          "Manufacturing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new formula version (draft)",
+        "tags": [
+          "Manufacturing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/boms/{id}": {
+      "get": {
+        "summary": "Formula with components and standard cost roll-up",
+        "tags": [
+          "Manufacturing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/boms/{id}/approve": {
+      "post": {
+        "summary": "Approve version (archives the previous approved one; SoD)",
+        "tags": [
+          "Manufacturing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/requirements": {
+      "get": {
+        "summary": "Material availability for a planned quantity",
+        "tags": [
+          "Manufacturing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/mrp": {
+      "get": {
+        "summary": "MRP: net requirements of open orders vs stock, with purchase suggestions",
+        "tags": [
+          "Manufacturing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/orders": {
+      "get": {
+        "summary": "Production orders",
+        "tags": [
+          "Manufacturing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create production order (approved formula; output to quarantine)",
+        "tags": [
+          "Manufacturing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/orders/{id}": {
+      "get": {
+        "summary": "Order with entries and material availability",
+        "tags": [
+          "Manufacturing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a draft order",
+        "tags": [
+          "Manufacturing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/orders/{id}/cost": {
+      "get": {
+        "summary": "Actual vs standard cost, yield, material variances",
+        "tags": [
+          "Manufacturing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/orders/{id}/release": {
+      "post": {
+        "summary": "Release (freezes standard unit cost, assigns number)",
+        "tags": [
+          "Manufacturing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/orders/{id}/issue": {
+      "post": {
+        "summary": "Issue (or return) material — FEFO, no expired/held lots",
+        "tags": [
+          "Manufacturing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/orders/{id}/time": {
+      "post": {
+        "summary": "Record line hours (conversion cost absorbed to WIP)",
+        "tags": [
+          "Manufacturing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/manufacturing/orders/{id}/complete": {
+      "post": {
+        "summary": "Complete: output lot into quarantine at actual cost; WIP cleared",
+        "tags": [
+          "Manufacturing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/quality/specs": {
+      "get": {
+        "summary": "Quality specs of an item",
+        "tags": [
+          "Quality"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace specs of (item, stage); mark HACCP critical control points",
+        "tags": [
+          "Quality"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/quality/checks": {
+      "get": {
+        "summary": "Quality checks (by lot or latest)",
+        "tags": [
+          "Quality"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Record a check — judged by the system against specs; failure holds the lot and opens an NCR",
+        "tags": [
+          "Quality"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/quality/ncrs": {
+      "get": {
+        "summary": "Non-conformance reports",
+        "tags": [
+          "Quality"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/quality/ncrs/{id}/close": {
+      "post": {
+        "summary": "Close NCR with disposition and CAPA",
+        "tags": [
+          "Quality"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/quality/trace/{id}": {
+      "get": {
+        "summary": "Full genealogy of a lot: backward to suppliers, forward through production to customers",
+        "tags": [
+          "Quality"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/quality/recalls": {
+      "get": {
+        "summary": "Recalls",
+        "tags": [
+          "Quality"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Start a recall: holds every affected lot and freezes the trace as evidence",
+        "tags": [
+          "Quality"
         ],
         "responses": {
           "200": {

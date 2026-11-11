@@ -20,6 +20,8 @@ import Items from "./pages/erp/Items";
 import Stock from "./pages/erp/Stock";
 import SalesInvoices, { ArAging, Receipts, SalesReturns } from "./pages/erp/Sales";
 import PurchaseReceipts, { StockDocuments, SupplierInvoices } from "./pages/erp/Purchasing";
+import { Formulas, Mrp, ProductionOrders } from "./pages/mfg/Manufacturing";
+import { NonConformances, QualityChecks, QualitySpecs, TraceRecall } from "./pages/mfg/Quality";
 
 function ThemeToggle() {
   const { t } = useI18n();
@@ -77,6 +79,15 @@ function Shell() {
           {L("/inventory/stock", tt("أرصدة المخزون", "Stock on hand"), me.modules.includes("inventory") && can("inventory.stock.view"))}
           {L("/inventory/items", tt("الأصناف", "Items"), me.modules.includes("inventory") && can("inventory.items.view"))}
           {L("/inventory/documents", tt("المستندات المخزنية", "Stock documents"), me.modules.includes("inventory") && can("inventory.stock.view"))}
+          {me.modules.includes("manufacturing") && can("manufacturing.orders.view") && <div className="nav-group">{tt("التصنيع", "Manufacturing")}</div>}
+          {L("/manufacturing/orders", tt("أوامر الإنتاج", "Production orders"), me.modules.includes("manufacturing") && can("manufacturing.orders.view"))}
+          {L("/manufacturing/boms", tt("الوصفات", "Formulas"), me.modules.includes("manufacturing") && can("manufacturing.boms.view"))}
+          {L("/manufacturing/mrp", tt("تخطيط الاحتياجات", "MRP"), me.modules.includes("manufacturing") && can("manufacturing.planning.view"))}
+          {me.modules.includes("quality") && can("quality.view") && <div className="nav-group">{tt("الجودة", "Quality")}</div>}
+          {L("/quality/checks", tt("الفحوصات", "Checks"), me.modules.includes("quality") && can("quality.view"))}
+          {L("/quality/ncr", tt("عدم المطابقة", "Non-conformance"), me.modules.includes("quality") && can("quality.view"))}
+          {L("/quality/trace", tt("التتبع والاستدعاء", "Trace & recall"), me.modules.includes("quality") && can("quality.view"))}
+          {L("/quality/specs", tt("المواصفات و HACCP", "Specs & HACCP"), me.modules.includes("quality") && can("quality.view"))}
           {hasAcc && can("accounting.journal.view") && <div className="nav-group">{t.groupFinance}</div>}
           {L("/accounts", t.coa, hasAcc && can("accounting.accounts.view"))}
           {L("/journal", t.journal, hasAcc && can("accounting.journal.view"))}
@@ -130,6 +141,13 @@ function Shell() {
             <Route path="/sales/aging" element={<ArAging />} />
             <Route path="/purchasing/receipts" element={<PurchaseReceipts />} />
             <Route path="/purchasing/invoices" element={<SupplierInvoices />} />
+            <Route path="/manufacturing/orders" element={<ProductionOrders />} />
+            <Route path="/manufacturing/boms" element={<Formulas />} />
+            <Route path="/manufacturing/mrp" element={<Mrp />} />
+            <Route path="/quality/checks" element={<QualityChecks />} />
+            <Route path="/quality/ncr" element={<NonConformances />} />
+            <Route path="/quality/trace" element={<TraceRecall />} />
+            <Route path="/quality/specs" element={<QualitySpecs />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

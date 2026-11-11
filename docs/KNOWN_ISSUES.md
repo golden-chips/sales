@@ -18,6 +18,9 @@
 | K14 | Medium | Supplier invoice must not exceed received value — purchase price variance and landed costs not supported | Phase 2b remainder |
 | K15 | Medium | Return on a fully paid credit invoice is rejected (cash refund flow missing); debit/credit notes missing | Phase 2b remainder |
 | K16 | Low | Serial numbers, bin locations, multiple price lists not implemented | Later |
-| K17 | Low | Some UI inputs (supplier invoice number, unit codes) use browser `prompt()` | Replace with modals |
+| K17 | Low | Some UI inputs (supplier invoice number, unit codes, recall reason, work center) use browser `prompt()` | Replace with modals |
+| K18 | Medium | Capacity planning, line scheduling, shifts, downtime/OEE, by-products not implemented | Phase 3 remainder |
+| K19 | Medium | Weighted average is per warehouse+item, so all lots of an item share one cost (lot-level actual cost not supported) | Option for lot costing later if required |
+| K20 | Low | Recall does not yet notify customers automatically (list is produced; WhatsApp integration in Phase 4) | Phase 4 |
 
 Legacy systems findings (V1–V10, H1–H6) are in `PHASE0_DISCOVERY_AUDIT.md`; they live in the `van-sales-app` repository and were **not modified** in this phase.

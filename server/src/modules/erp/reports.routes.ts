@@ -68,6 +68,18 @@ export async function erpReportRoutes(app: FastifyInstance) {
     });
   });
 
+  app.get("/inventory/lots", { schema: { ...T, summary: "Lots (search by number/item), with hold status, expiry and on-hand quantity" }, preHandler: can("inventory.stock.view") }, async (req) => {
+    const q = parse(z.object({ companyId: zUuid, itemId: zUuid.optional(), q: z.string().optional(), onHold: z.enum(["true", "false"]).optional() }), req.query);
+    return tdb(req, async (db) => (await db.query(
+      `SELECT l.id, l.lot_no, l.production_date, l.expiry_date, l.on_hold, l.hold_reason, i.id AS item_id, i.code AS item_code, i.name_ar AS item_name_ar, i.kind,
+              coalesce((SELECT sum(qty) FROM lot_balances lb WHERE lb.lot_id = l.id), 0) AS on_hand,
+              (SELECT result FROM quality_checks c WHERE c.lot_id = l.id ORDER BY checked_at DESC LIMIT 1) AS last_qc
+         FROM lots l JOIN items i ON i.id = l.item_id
+        WHERE i.company_id = $1 AND ($2::uuid IS NULL OR l.item_id = $2) AND ($3::text IS NULL OR l.lot_no ILIKE '%'||$3||'%' OR i.code ILIKE '%'||$3||'%')
+          AND ($4::boolean IS NULL OR l.on_hold = $4)
+        ORDER BY l.created_at DESC LIMIT 300`, [q.companyId, q.itemId ?? null, q.q ?? null, q.onHold === undefined ? null : q.onHold === "true"])).rows);
+  });
+
   app.get("/inventory/valuation-check", { schema: { ...T, summary: "Reconcile stock subledger value with GL inventory accounts" }, preHandler: can("inventory.stock.view") }, async (req) => {
     const q = parse(z.object({ companyId: zUuid }), req.query);
     return tdb(req, async (db) => {
