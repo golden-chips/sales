@@ -84,7 +84,8 @@ export async function postInvoice(db: Db, u: UserCtx, id: string) {
     cogs = (await n(db, "SELECT ($1::numeric + $2::numeric)::text AS t", [cogs, out.value])).t;
   }
   parts.push(
-    { role: d.payment_type === "cash" ? "cash_main" : "ar", amount: d.total },
+    // cash taken by a rep sits in the rep's custody until handed over
+    { role: d.payment_type === "cash" ? (d.rep_id ? "rep_cash_custody" : "cash_main") : "ar", amount: d.total },
     { role: "sales_revenue", amount: "-" + d.subtotal },
     { role: "sales_discounts", amount: d.discount_total },
     { role: "tax_payable", amount: "-" + d.tax_total },

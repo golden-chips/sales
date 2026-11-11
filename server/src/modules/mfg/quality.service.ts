@@ -130,7 +130,16 @@ export async function createRecall(db: Db, u: UserCtx, b: { companyId: string; l
   await db.query("UPDATE lots SET on_hold = true, hold_reason = $2 WHERE id = ANY($1::uuid[])", [forward.lots.map((l) => l.id), `RECALL ${number}`]);
   const r = await one(db, `INSERT INTO recalls (tenant_id, company_id, number, lot_id, reason, snapshot, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
     [u.tenantId, b.companyId, number, b.lotId, b.reason, JSON.stringify({ forward, backward, at: new Date().toISOString() }), u.userId]);
+  // queue a WhatsApp notice for every affected customer with a phone number (delivered by the outbox sender when a channel is configured)
+  let queued = 0;
+  for (const c of forward.customers) {
+    if (!c.phone || Number(c.in_market) <= 0) continue;
+    await db.query(`INSERT INTO notification_outbox (tenant_id, channel, recipient, party_id, template, payload, source_type, source_id)
+       VALUES ($1,'whatsapp',$2,$3,'product_recall',$4,'recall',$5)`,
+      [u.tenantId, c.phone, c.id, JSON.stringify({ recall: number, customer: c.name_ar, lot: c.lot_no, quantity: c.in_market, reason: b.reason }), r.id]);
+    queued++;
+  }
   await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "quality.recall_created", entityType: "recall", entityId: r.id,
-    after: { number, lot: lot.lot_no, lotsHeld: forward.lots.length, customers: forward.customers.length } });
-  return { ...r, forward, backward };
+    after: { number, lot: lot.lot_no, lotsHeld: forward.lots.length, customers: forward.customers.length, notificationsQueued: queued } });
+  return { ...r, forward, backward, notificationsQueued: queued };
 }

@@ -89,6 +89,7 @@ export async function orgRoutes(app: FastifyInstance) {
       dateFormat: z.enum(["DD/MM/YYYY", "YYYY-MM-DD", "MM/DD/YYYY"]).optional(), numberLocale: z.enum(["ar-LY", "en-US", "ar-EG", "fr-FR"]).optional(),
       fiscalYearStartMonth: z.number().int().min(1).max(12).optional(), enforceSod: z.boolean().optional(), mfaRequired: z.boolean().optional(),
       passwordMinLength: z.number().int().min(8).max(128).optional(), sessionTtlMinutes: z.number().int().min(5).max(1440).optional(), maxFailedLogins: z.number().int().min(3).max(20).optional(),
+      fieldGpsRequired: z.boolean().optional(),
     }), req.body);
     const u = req.user!;
     return tdb(req, async (db) => {
@@ -96,8 +97,8 @@ export async function orgRoutes(app: FastifyInstance) {
       const r = (await db.query(
         `UPDATE tenant_settings SET date_format = coalesce($1, date_format), number_locale = coalesce($2, number_locale), fiscal_year_start_month = coalesce($3, fiscal_year_start_month),
            enforce_sod = coalesce($4, enforce_sod), mfa_required = coalesce($5, mfa_required), password_min_length = coalesce($6, password_min_length),
-           session_ttl_minutes = coalesce($7, session_ttl_minutes), max_failed_logins = coalesce($8, max_failed_logins) RETURNING *`,
-        [b.dateFormat ?? null, b.numberLocale ?? null, b.fiscalYearStartMonth ?? null, b.enforceSod ?? null, b.mfaRequired ?? null, b.passwordMinLength ?? null, b.sessionTtlMinutes ?? null, b.maxFailedLogins ?? null])).rows[0];
+           session_ttl_minutes = coalesce($7, session_ttl_minutes), max_failed_logins = coalesce($8, max_failed_logins), field_gps_required = coalesce($9, field_gps_required) RETURNING *`,
+        [b.dateFormat ?? null, b.numberLocale ?? null, b.fiscalYearStartMonth ?? null, b.enforceSod ?? null, b.mfaRequired ?? null, b.passwordMinLength ?? null, b.sessionTtlMinutes ?? null, b.maxFailedLogins ?? null, b.fieldGpsRequired ?? null])).rows[0];
       await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "settings.updated", entityType: "tenant_settings", entityId: u.tenantId, before, after: r, ip: req.ip, requestId: req.id });
       return r;
     });
