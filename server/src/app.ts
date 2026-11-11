@@ -13,6 +13,9 @@ import { iamRoutes } from "./modules/iam/iam.routes.js";
 import { orgRoutes } from "./modules/org/org.routes.js";
 import { auditRoutes } from "./modules/audit/audit.routes.js";
 import { accountingRoutes } from "./modules/accounting/accounting.routes.js";
+import { masterDataRoutes } from "./modules/erp/masterdata.routes.js";
+import { documentRoutes } from "./modules/erp/documents.routes.js";
+import { erpReportRoutes } from "./modules/erp/reports.routes.js";
 import { pool } from "./db/pool.js";
 
 const PG_MAP: Record<string, [number, string, string, string]> = {
@@ -82,6 +85,9 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     await v1.register(orgRoutes);
     await v1.register(auditRoutes);
     await v1.register(accountingRoutes, { prefix: "/accounting" });
+    await v1.register(masterDataRoutes);
+    await v1.register(documentRoutes);
+    await v1.register(erpReportRoutes);
   }, { prefix: "/api/v1" });
 
   return app;

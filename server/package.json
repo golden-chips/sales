@@ -10,7 +10,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:reset-test": "tsx scripts/reset-test-db.ts",
     "test": "vitest run",
-    "openapi:export": "tsx scripts/export-openapi.ts"
+    "openapi:export": "tsx scripts/export-openapi.ts",
+    "roles:sync": "tsx scripts/sync-roles.ts"
   },
   "author": "",
   "license": "ISC",

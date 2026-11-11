@@ -162,7 +162,7 @@ export async function deleteDraft(db: Db, u: UserCtx, id: string) {
   await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "journal.draft_deleted", entityType: "journal_entry", entityId: id, before });
 }
 
-async function nextNumber(db: Db, tenantId: string, companyId: string, docType: string, prefix: string, year: string) {
+export async function nextNumber(db: Db, tenantId: string, companyId: string, docType: string, prefix: string, year: string) {
   const key = `${docType}-${year}`;
   await db.query("INSERT INTO document_sequences (tenant_id, company_id, doc_type, prefix) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING", [tenantId, companyId, key, `${prefix}-${year}-`]);
   const r = (await db.query("UPDATE document_sequences SET next_value = next_value + 1 WHERE company_id = $1 AND doc_type = $2 RETURNING prefix, next_value - 1 AS v, padding", [companyId, key])).rows[0];
