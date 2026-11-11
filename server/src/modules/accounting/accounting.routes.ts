@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { can, tdb, assertBranchAccess } from "../../core/auth.js";
-import { parse, zPage, pageSql, paged, zUuid, zMoney, zDate, idempotent, orderBy } from "../../core/http.js";
+import { parse, zPage, pageSql, paged, zUuid, zMoney, zDate, idempotent, send, orderBy } from "../../core/http.js";
 import { E } from "../../core/errors.js";
 import { audit } from "../../core/audit.js";
 import * as svc from "./accounting.service.js";
@@ -140,7 +140,7 @@ export async function accountingRoutes(app: FastifyInstance) {
   app.post("/journal-entries", { schema: { ...T, summary: "Create draft journal entry (Idempotency-Key supported)" }, preHandler: can("accounting.journal.create") }, async (req, reply) => {
     const b = parse(zEntry, req.body);
     assertBranchAccess(req.user!, b.branchId);
-    return tdb(req, (db) => idempotent(req, reply, db, req.user!.tenantId, async () => ({ status: 201, body: await svc.createDraft(db, req.user!, b) })));
+    return send(reply, await tdb(req, (db) => idempotent(req, db, req.user!.tenantId, async () => ({ status: 201, body: await svc.createDraft(db, req.user!, b) }))));
   });
 
   app.put("/journal-entries/:id", { schema: { ...T, summary: "Replace a draft entry" }, preHandler: can("accounting.journal.create") }, async (req) => {
@@ -158,13 +158,13 @@ export async function accountingRoutes(app: FastifyInstance) {
 
   app.post("/journal-entries/:id/post", { schema: { ...T, summary: "Post a draft (balanced, open period, SoD enforced)" }, preHandler: can("accounting.journal.post") }, async (req, reply) => {
     const { id } = parse(z.object({ id: zUuid }), req.params);
-    return tdb(req, (db) => idempotent(req, reply, db, req.user!.tenantId, async () => ({ status: 200, body: await svc.postEntry(db, req.user!, id) })));
+    return send(reply, await tdb(req, (db) => idempotent(req, db, req.user!.tenantId, async () => ({ status: 200, body: await svc.postEntry(db, req.user!, id) }))));
   });
 
   app.post("/journal-entries/:id/reverse", { schema: { ...T, summary: "Reverse a posted entry with a documented reversal" }, preHandler: can("accounting.journal.reverse") }, async (req, reply) => {
     const { id } = parse(z.object({ id: zUuid }), req.params);
     const b = parse(z.object({ reason: z.string().min(5).max(500), reversalDate: zDate.optional() }), req.body);
-    return tdb(req, (db) => idempotent(req, reply, db, req.user!.tenantId, async () => ({ status: 201, body: await svc.reverseEntry(db, req.user!, id, b) })));
+    return send(reply, await tdb(req, (db) => idempotent(req, db, req.user!.tenantId, async () => ({ status: 201, body: await svc.reverseEntry(db, req.user!, id, b) }))));
   });
 
   // ------------------------------------------------------------ reports

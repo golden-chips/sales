@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { can, tdb, assertBranchAccess } from "../../core/auth.js";
-import { parse, zPage, pageSql, paged, zUuid, zMoney, zDate, idempotent } from "../../core/http.js";
+import { parse, zPage, pageSql, paged, zUuid, zMoney, zDate, idempotent, send } from "../../core/http.js";
 import { E } from "../../core/errors.js";
 import { audit } from "../../core/audit.js";
 import * as sales from "./sales.service.js";
@@ -41,11 +41,11 @@ function registerDoc(app: FastifyInstance, d: DocDef) {
   app.post(d.path, { schema: { ...T, summary: `Create draft (${d.table}) — Idempotency-Key supported` }, preHandler: can(d.create) }, async (req, reply) => {
     const b = parse(d.bodySchema, req.body);
     if ((b as any).branchId) assertBranchAccess(req.user!, (b as any).branchId);
-    return tdb(req, (db) => idempotent(req, reply, db, req.user!.tenantId, async () => ({ status: 201, body: await d.create_(db, req.user!, b) })));
+    return send(reply, await tdb(req, (db) => idempotent(req, db, req.user!.tenantId, async () => ({ status: 201, body: await d.create_(db, req.user!, b) }))));
   });
   app.post(`${d.path}/:id/post`, { schema: { ...T, summary: `Post (${d.table}): stock + journal in one transaction; segregation of duties` }, preHandler: can(d.post) }, async (req, reply) => {
     const { id } = parse(z.object({ id: zUuid }), req.params);
-    return tdb(req, (db) => idempotent(req, reply, db, req.user!.tenantId, async () => ({ status: 200, body: await d.post_(db, req.user!, id) })));
+    return send(reply, await tdb(req, (db) => idempotent(req, db, req.user!.tenantId, async () => ({ status: 200, body: await d.post_(db, req.user!, id) }))));
   });
   app.delete(`${d.path}/:id`, { schema: { ...T, summary: `Delete a draft (${d.table})` }, preHandler: can(d.create) }, async (req) => {
     const { id } = parse(z.object({ id: zUuid }), req.params);

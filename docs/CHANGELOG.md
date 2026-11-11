@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1 — 2026-11-11
+### Fixed
+- **K12 (read-your-writes race):** routes using `Idempotency-Key` sent the HTTP response before the transaction committed, so an immediate follow-up request could read stale data. This caused intermittent local failures and consistent GitHub CI failures (4 tests in `core-erp`). The response is now sent only after COMMIT. A regression assertion was added, and the K12 diagnostic probe was removed.
+
 ## 0.5.0 — 2026-11-11 — Excel import, Phase 5 (HR & payroll), free trial, Android
 ### Added
 - **Excel import** (customers, suppliers, items, opening stock, opening GL balances): official templates with an instructions sheet, keyed headers in any order, per-row validation preview, all-or-nothing import, drafts for opening balances (SoD).

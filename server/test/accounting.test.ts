@@ -89,14 +89,10 @@ describe("general ledger", () => {
     const d = await draft(accountant.token, cashSale("10"));
     const posted = await api("POST", `/api/v1/accounting/journal-entries/${d.body.id}/post`, {}, { token: accountant2.token });
     expect(posted.status, JSON.stringify(posted.body)).toBe(200);
-    const probe = await withTenant(T.tenantId, null, async (db) => {
-      const before = (await db.query("SELECT e.status, e.number, count(l.*) AS lines FROM journal_entries e LEFT JOIN journal_lines l ON l.entry_id = e.id WHERE e.id = $1 GROUP BY e.id", [d.body.id])).rows[0];
-      const trg = (await db.query("SELECT tgname, tgenabled FROM pg_trigger WHERE tgrelid = 'journal_lines'::regclass AND NOT tgisinternal")).rows;
-      return { before, trg, posted: posted.body.status, id: d.body.id, postedId: posted.body.id };
-    });
-    // K12 diagnostics: if this UPDATE ever succeeds, record exactly what the database saw
+    // read-your-writes: the reply is sent only after COMMIT (K12 root cause — see KNOWN_ISSUES)
+    const seen = await withTenant(T.tenantId, null, async (db) => (await db.query("SELECT status FROM journal_entries WHERE id = $1", [d.body.id])).rows[0]);
+    expect(seen.status).toBe("posted");
     const upd = await withTenant(T.tenantId, null, (db) => db.query("UPDATE journal_lines SET debit = 999 WHERE entry_id = $1 AND debit > 0", [d.body.id])).then((r) => r, (e) => e);
-    if (!(upd instanceof Error)) console.log("K12-PROBE", JSON.stringify({ ...probe, rowCount: (upd as any).rowCount, db: process.env.DATABASE_URL?.split("@")[1] }));
     expect(upd).toBeInstanceOf(Error);
     expect((upd as Error).message).toMatch(/immutable/);
     await expect(withTenant(T.tenantId, null, (db) => db.query("UPDATE journal_entries SET memo = 'changed' WHERE id = $1", [d.body.id]))).rejects.toThrow(/immutable/);

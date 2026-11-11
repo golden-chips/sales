@@ -36,14 +36,17 @@ export function orderBy(sort: string | undefined, allowed: Record<string, string
  * returned for an identical retry; a different payload with the same key is
  * rejected. Runs in the caller's transaction, guarded by an advisory lock.
  */
+export interface IdemResult<T> { status: number; body: T; replayed?: boolean }
+
+/** Runs `fn` once per Idempotency-Key INSIDE the caller's transaction and returns the
+ *  result. It deliberately does NOT send the reply: the caller must send it only after the
+ *  transaction has committed (see `send`), otherwise a client can observe the response —
+ *  and issue its next request — before the data is visible (read-your-writes race). */
 export async function idempotent<T>(
-  req: FastifyRequest, reply: FastifyReply, db: Db, tenantId: string, fn: () => Promise<{ status: number; body: T }>,
-) {
+  req: FastifyRequest, db: Db, tenantId: string, fn: () => Promise<{ status: number; body: T }>,
+): Promise<IdemResult<T>> {
   const key = req.headers["idempotency-key"];
-  if (typeof key !== "string" || !key) {
-    const r = await fn();
-    return reply.code(r.status).send(r.body);
-  }
+  if (typeof key !== "string" || !key) return fn();
   if (key.length < 8 || key.length > 200) throw E.validation([{ path: "Idempotency-Key", message: "length 8..200" }]);
   const route = `${req.method} ${req.routeOptions.url}`;
   const hash = sha256(JSON.stringify({ route, params: req.params, body: req.body ?? null }));
@@ -52,13 +55,18 @@ export async function idempotent<T>(
   if (prev.rows[0]) {
     if (prev.rows[0].request_hash !== hash)
       throw E.rule("IDEMPOTENCY_KEY_REUSED", "تم استخدام مفتاح التكرار لطلب مختلف", "Idempotency-Key was already used for a different request");
-    reply.header("Idempotent-Replayed", "true");
-    return reply.code(prev.rows[0].status_code).send(prev.rows[0].response_body);
+    return { status: prev.rows[0].status_code, body: prev.rows[0].response_body, replayed: true };
   }
   const r = await fn();
   await db.query(
     "INSERT INTO idempotency_keys (tenant_id, key, route, request_hash, status_code, response_body) VALUES ($1,$2,$3,$4,$5,$6)",
     [tenantId, key, route, hash, r.status, JSON.stringify(r.body)],
   );
+  return r;
+}
+
+/** Sends an `idempotent` result — call with the value of an already-committed transaction. */
+export function send<T>(reply: FastifyReply, r: IdemResult<T>) {
+  if (r.replayed) reply.header("Idempotent-Replayed", "true");
   return reply.code(r.status).send(r.body);
 }

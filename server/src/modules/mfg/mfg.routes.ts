@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { can, tdb } from "../../core/auth.js";
-import { parse, zPage, pageSql, paged, zUuid, zMoney, zDate, idempotent } from "../../core/http.js";
+import { parse, zPage, pageSql, paged, zUuid, zMoney, zDate, idempotent, send } from "../../core/http.js";
 import { E } from "../../core/errors.js";
 import { audit } from "../../core/audit.js";
 import * as mfg from "./mfg.service.js";
@@ -88,7 +88,7 @@ export async function mfgRoutes(app: FastifyInstance) {
   app.post("/manufacturing/orders", { schema: { ...M, summary: "Create production order (approved formula; output to quarantine)" }, preHandler: can("manufacturing.orders.manage") }, async (req, reply) => {
     const b = parse(z.object({ companyId: zUuid, itemId: zUuid, bomId: zUuid.optional(), workCenterId: zUuid.nullable().optional(), plannedQty: zQty, materialWarehouseId: zUuid,
       outputWarehouseId: zUuid, plannedDate: zDate, notes: z.string().max(2000).optional() }), req.body);
-    return tdb(req, (db) => idempotent(req, reply, db, req.user!.tenantId, async () => ({ status: 201, body: await mfg.createOrder(db, req.user!, b) })));
+    return send(reply, await tdb(req, (db) => idempotent(req, db, req.user!.tenantId, async () => ({ status: 201, body: await mfg.createOrder(db, req.user!, b) }))));
   });
   app.delete("/manufacturing/orders/:id", { schema: { ...M, summary: "Delete a draft order" }, preHandler: can("manufacturing.orders.manage") }, async (req) => {
     const { id } = parse(id$, req.params);
@@ -102,18 +102,18 @@ export async function mfgRoutes(app: FastifyInstance) {
   app.post("/manufacturing/orders/:id/issue", { schema: { ...M, summary: "Issue (or return) material — FEFO, no expired/held lots" }, preHandler: can("manufacturing.execution.issue") }, async (req, reply) => {
     const { id } = parse(id$, req.params);
     const b = parse(z.object({ itemId: zUuid, qty: zQty, lotId: zUuid.nullable().optional(), entryDate: zDate, kind: z.enum(["issue", "return"]).default("issue") }), req.body);
-    return tdb(req, (db) => idempotent(req, reply, db, req.user!.tenantId, async () => ({ status: 201, body: await mfg.issueMaterial(db, req.user!, id, b) })));
+    return send(reply, await tdb(req, (db) => idempotent(req, db, req.user!.tenantId, async () => ({ status: 201, body: await mfg.issueMaterial(db, req.user!, id, b) }))));
   });
   app.post("/manufacturing/orders/:id/time", { schema: { ...M, summary: "Record line hours (conversion cost absorbed to WIP)" }, preHandler: can("manufacturing.execution.time") }, async (req, reply) => {
     const { id } = parse(id$, req.params);
     const b = parse(z.object({ hours: zQty, entryDate: zDate, notes: z.string().max(500).optional() }), req.body);
-    return tdb(req, (db) => idempotent(req, reply, db, req.user!.tenantId, async () => ({ status: 201, body: await mfg.recordTime(db, req.user!, id, b) })));
+    return send(reply, await tdb(req, (db) => idempotent(req, db, req.user!.tenantId, async () => ({ status: 201, body: await mfg.recordTime(db, req.user!, id, b) }))));
   });
   app.post("/manufacturing/orders/:id/complete", { schema: { ...M, summary: "Complete: output lot into quarantine at actual cost; WIP cleared" }, preHandler: can("manufacturing.orders.complete") }, async (req, reply) => {
     const { id } = parse(id$, req.params);
     const b = parse(z.object({ producedQty: zQty, scrapQty: z.union([z.string(), z.number()]).transform(String).optional(), lotNo: z.string().min(1).max(60),
       productionDate: zDate, expiryDate: zDate.optional(), entryDate: zDate }), req.body);
-    return tdb(req, (db) => idempotent(req, reply, db, req.user!.tenantId, async () => ({ status: 200, body: await mfg.completeOrder(db, req.user!, id, b) })));
+    return send(reply, await tdb(req, (db) => idempotent(req, db, req.user!.tenantId, async () => ({ status: 200, body: await mfg.completeOrder(db, req.user!, id, b) }))));
   });
 
   // ---------------------------------------------------------------- quality
