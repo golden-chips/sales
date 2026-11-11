@@ -6,7 +6,7 @@ import { ErrorBox, Field } from "../ui";
 import { TopControls } from "../App";
 
 export default function Login() {
-  const { t } = useI18n();
+  const { t, tt } = useI18n();
   const { signIn } = useSession();
   const [f, setF] = useState(() => ({ tenant: (() => { try { return localStorage.getItem("ge.tenant") ?? ""; } catch { return ""; } })(), email: "", password: "", otp: "" }));
   const [needOtp, setNeedOtp] = useState(false);
@@ -34,6 +34,7 @@ export default function Login() {
         <Field label={t.password}><input required type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} dir="ltr" autoComplete="current-password" /></Field>
         {needOtp && <Field label={t.otp}><input inputMode="numeric" pattern="\d{6}" value={f.otp} onChange={(e) => setF({ ...f, otp: e.target.value })} dir="ltr" autoFocus autoComplete="one-time-code" /></Field>}
         <button className="btn primary" disabled={busy}>{busy ? t.signingIn : t.login}</button>
+        <a href="/signup" className="btn" style={{ justifyContent: "center", textDecoration: "none" }}>{tt("جرّب مجانًا — أنشئ حساب شركتك", "Start a free trial")}</a>
         <a href="/platform" style={{ fontSize: 12, textAlign: "center" }}>{t.platform}</a>
       </form>
     </div>

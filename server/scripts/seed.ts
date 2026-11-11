@@ -43,6 +43,8 @@ async function main() {
         [p.code, p.ar, p.en, p.users, p.companies, p.branches, p.wh, p.mb, p.rpm]);
       if (ins.rowCount) await db.query("INSERT INTO plan_modules (plan_id, module_code) SELECT $1, unnest($2::text[])", [ins.rows[0].id, ["core", ...p.modules]]);
     }
+    // self-service trials start on the Manufacturing plan for 14 days (a commercial choice the owner can change in the platform console)
+    await db.query("UPDATE plans SET is_trial_default = (code = 'manufacturing') WHERE NOT EXISTS (SELECT 1 FROM plans WHERE is_trial_default AND code <> 'manufacturing')");
     console.log("plans ready (prices = 0 placeholders; set real prices after approval)");
   });
 

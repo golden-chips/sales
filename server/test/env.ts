@@ -9,4 +9,5 @@ export const testEnv: Record<string, string> = {
   LOG_LEVEL: "silent",
   RATE_LIMIT_PER_MIN: "100000",
   LOGIN_RATE_LIMIT_PER_MIN: "100000",
+  SIGNUP_RATE_LIMIT_PER_HOUR: "100000",
 };

@@ -138,6 +138,40 @@ export async function platformRoutes(app: FastifyInstance) {
       });
     });
 
+    p.get("/upgrade-requests", { schema: { ...T, summary: "Upgrade / activation requests from tenants" } }, async (req) => {
+      const q = parse(z.object({ status: z.enum(["open", "done", "rejected"]).optional() }), req.query);
+      return withPlatform(async (db) => (await db.query(`SELECT r.*, t.code AS tenant_code, t.legal_name, t.status AS tenant_status, t.contact_phone AS tenant_phone, t.signup_source
+         FROM upgrade_requests r JOIN tenants t ON t.id = r.tenant_id WHERE ($1::upgrade_status IS NULL OR r.status = $1) ORDER BY r.created_at DESC LIMIT 300`, [q.status ?? null])).rows);
+    });
+    p.post("/upgrade-requests/:id/complete", { schema: { ...T, summary: "Activate the requested plan (issues the invoice) and close the request" } }, async (req) => {
+      const { id } = parse(z.object({ id: zUuid }), req.params);
+      return withPlatform(async (db) => {
+        const r = (await db.query("SELECT * FROM upgrade_requests WHERE id = $1 AND status = 'open' FOR UPDATE", [id])).rows[0];
+        if (!r) throw E.notFound("open upgrade request");
+        const out = await changePlan(db, r.tenant_id, r.plan_code, r.billing_cycle, req.platformUserId!);
+        await db.query("UPDATE upgrade_requests SET status = 'done', handled_by = $2, handled_at = now() WHERE id = $1", [id, req.platformUserId]);
+        return out;
+      });
+    });
+    p.post("/upgrade-requests/:id/reject", { schema: { ...T, summary: "Reject an upgrade request" } }, async (req) => {
+      const { id } = parse(z.object({ id: zUuid }), req.params);
+      return withPlatform(async (db) => {
+        const r = (await db.query("UPDATE upgrade_requests SET status = 'rejected', handled_by = $2, handled_at = now() WHERE id = $1 AND status = 'open' RETURNING *", [id, req.platformUserId])).rows[0];
+        if (!r) throw E.notFound("open upgrade request");
+        return r;
+      });
+    });
+    p.post("/plans/:code/trial-default", { schema: { ...T, summary: "Make this plan the one self-service trials start on" } }, async (req) => {
+      const { code } = parse(z.object({ code: z.string() }), req.params);
+      return withPlatform(async (db) => {
+        await db.query("UPDATE plans SET is_trial_default = false WHERE is_trial_default");
+        const r = (await db.query("UPDATE plans SET is_trial_default = true WHERE code = $1 RETURNING code, trial_days", [code])).rows[0];
+        if (!r) throw E.notFound("plan");
+        await audit(db, { tenantId: null, actorType: "platform", actorId: req.platformUserId!, action: "plan.trial_default", entityType: "plan", entityId: code });
+        return r;
+      });
+    });
+
     p.post("/subscriptions/sweep", { schema: { ...T, summary: "Run subscription lifecycle sweep now" } }, async () => withPlatform((db) => sweepSubscriptions(db)));
 
     p.get("/audit", { schema: { ...T, summary: "Platform-level audit events (no tenant business data)" } }, async (req) => {

@@ -15,6 +15,8 @@ import Periods from "./pages/Periods";
 import AuditLog from "./pages/AuditLog";
 import Subscription from "./pages/Subscription";
 import PlatformApp from "./platform/PlatformApp";
+import Signup from "./pages/Signup";
+import TrialBanner from "./pages/TrialBanner";
 import Parties from "./pages/erp/Parties";
 import Items from "./pages/erp/Items";
 import Stock from "./pages/erp/Stock";
@@ -136,6 +138,7 @@ function Shell() {
           </div>
         </div>
         <div className="content">
+          <TrialBanner />
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/accounts" element={<Accounts />} />
@@ -188,6 +191,7 @@ export default function App() {
   const { me, loading } = useSession();
   const loc = useLocation();
   if (loc.pathname.startsWith("/platform")) return <PlatformApp />;
+  if (loc.pathname === "/signup" && !me) return <Signup />;
   if (loading) return <div className="content"><Loading /></div>;
   return me ? <Shell /> : <Login />;
 }

@@ -20,6 +20,7 @@ import { mfgRoutes } from "./modules/mfg/mfg.routes.js";
 import { fieldRoutes } from "./modules/field/field.routes.js";
 import { importRoutes } from "./modules/import/import.routes.js";
 import { hrRoutes, iclockRoutes } from "./modules/hr/hr.routes.js";
+import { publicRoutes } from "./modules/platform/public.routes.js";
 import { pool } from "./db/pool.js";
 
 const PG_MAP: Record<string, [number, string, string, string]> = {
@@ -84,6 +85,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
 
   await app.register(async (v1) => {
     await v1.register(platformRoutes, { prefix: "/platform" });
+    await v1.register(publicRoutes, { prefix: "/public" });
     await v1.register(authRoutes, { prefix: "/auth" });
     await v1.register(iamRoutes);
     await v1.register(orgRoutes);

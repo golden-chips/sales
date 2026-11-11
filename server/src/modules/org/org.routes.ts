@@ -114,4 +114,20 @@ export async function orgRoutes(app: FastifyInstance) {
       const invoices = (await db.query("SELECT number, period_start, period_end, amount, discount, currency, status, issued_at, due_at, paid_at FROM platform_invoices ORDER BY issued_at DESC LIMIT 24")).rows;
       return { subscription: sub, usage, invoices };
     }));
+
+  app.post("/subscription/upgrade-request", { schema: { ...T, summary: "Ask the platform to activate / change the subscription (one open request at a time)" }, preHandler: can("core.subscription.view") }, async (req, reply) => {
+    const b = parse(z.object({ planCode: z.string().min(2), billingCycle: z.enum(["monthly", "yearly"]).default("monthly"), note: z.string().max(1000).optional(), contactPhone: z.string().max(30).optional() }), req.body);
+    const u = req.user!;
+    return reply.code(201).send(await tdb(req, async (db) => {
+      const plan = (await db.query("SELECT code FROM public_plans() WHERE code = $1", [b.planCode])).rows[0];
+      if (!plan) throw E.validation([{ path: "planCode", message: "unknown plan" }]);
+      const r = (await db.query(`INSERT INTO upgrade_requests (tenant_id, plan_code, billing_cycle, note, contact_phone, requested_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        [u.tenantId, b.planCode, b.billingCycle, b.note ?? null, b.contactPhone ?? null, u.userId]).catch((e) => {
+          if (e?.code === "23505") throw E.conflict("لديك طلب مفتوح بالفعل — سيتواصل معك فريقنا", "You already have an open request"); throw e; })).rows[0];
+      await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "subscription.upgrade_requested", entityType: "upgrade_request", entityId: r.id, after: b });
+      return r;
+    }));
+  });
+  app.get("/subscription/upgrade-requests", { schema: { ...T, summary: "Own upgrade requests" }, preHandler: can("core.subscription.view") }, async (req) =>
+    tdb(req, async (db) => (await db.query("SELECT * FROM upgrade_requests ORDER BY created_at DESC LIMIT 20")).rows));
 }

@@ -40,12 +40,21 @@ function Console({ onOut }: { onOut: () => void }) {
   const tenants = useAsync(() => api.get(`/platform/tenants?pageSize=200${q ? `&q=${encodeURIComponent(q)}` : ""}`, P), [q]);
   const plans = useAsync(() => api.get("/platform/plans", P), []);
   const detail = useAsync(() => (sel ? api.get(`/platform/tenants/${sel}`, P) : Promise.resolve(null)), [sel]);
+  const ups = useAsync(() => api.get("/platform/upgrade-requests?status=open", P), []);
+  const handle = async (id: string, a: "complete" | "reject") => { try { await api.post(`/platform/upgrade-requests/${id}/${a}`, {}, { scope: P }); toast(t.savedOk); ups.reload(); tenants.reload(); } catch (e) { toast(errMsg(e, lang), true); } };
   const act = async (path: string, body: unknown) => { try { await api.post(`/platform/tenants/${sel}/${path}`, body, { scope: P }); toast(t.savedOk); detail.reload(); tenants.reload(); } catch (e) { toast(errMsg(e, lang), true); } };
   return (
     <div className="content" style={{ maxWidth: 1300, margin: "0 auto" }}>
       <div className="page-head"><div><h1>{t.platform}</h1><p>{t.tenants} · {t.plans}</p></div>
         <div className="row"><TopControls /><button className="btn" onClick={async () => { try { const r = await api.post("/platform/subscriptions/sweep", {}, { scope: P }); toast(JSON.stringify(r)); tenants.reload(); } catch (e) { toast(errMsg(e, lang), true); } }}>sweep</button>
           <button className="btn primary" onClick={() => setProv(true)}>{t.provision}</button><button className="btn" onClick={onOut}>{t.logout}</button></div></div>
+      {!!ups.data?.length && <div className="card" style={{ marginBottom: 16 }}>
+        <h2>{lang === "ar" ? "طلبات الاشتراك" : "Subscription requests"} <span className="badge warn">{ups.data.length}</span></h2>
+        <div className="table-wrap"><table><thead><tr><th>{t.tenant}</th><th>{t.name}</th><th>{t.plan}</th><th>{lang === "ar" ? "الدفع" : "Billing"}</th><th>{lang === "ar" ? "الهاتف" : "Phone"}</th><th>{t.memo}</th><th /></tr></thead>
+          <tbody>{ups.data.map((r: any) => <tr key={r.id}><td className="num">{r.tenant_code}</td><td>{r.legal_name} {r.signup_source === "self_signup" && <span className="badge info">self</span>}</td><td>{r.plan_code}</td><td>{r.billing_cycle}</td>
+            <td className="num">{r.contact_phone ?? r.tenant_phone}</td><td>{r.note}</td>
+            <td className="row"><button className="btn sm primary" onClick={() => handle(r.id, "complete")}>{lang === "ar" ? "تفعيل" : "Activate"}</button><button className="btn sm" onClick={() => handle(r.id, "reject")}>{lang === "ar" ? "رفض" : "Reject"}</button></td></tr>)}</tbody>
+        </table></div></div>}
       <div className="card" style={{ marginBottom: 16 }}>
         <h2>{t.plans}</h2>
         {plans.loading ? <Loading rows={2} /> : <div className="table-wrap"><table>
