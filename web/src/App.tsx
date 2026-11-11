@@ -24,6 +24,7 @@ import { Formulas, Mrp, ProductionOrders } from "./pages/mfg/Manufacturing";
 import { NonConformances, QualityChecks, QualitySpecs, TraceRecall } from "./pages/mfg/Quality";
 import RepApp from "./pages/field/RepApp";
 import { Commissions, Notifications, Performance, Reps, Settlements } from "./pages/field/Distribution";
+import Import from "./pages/admin/Import";
 
 function ThemeToggle() {
   const { t } = useI18n();
@@ -103,6 +104,7 @@ function Shell() {
           {L("/trial-balance", t.trialBalance, hasAcc && can("accounting.reports.view"))}
           {L("/periods", t.periods, hasAcc && can("accounting.journal.view"))}
           <div className="nav-group">{t.groupAdmin}</div>
+          {L("/import", tt("استيراد من Excel", "Import from Excel"), ["sales.customers.manage", "purchasing.suppliers.manage", "inventory.items.manage", "inventory.moves.create", "accounting.journal.create"].some(can))}
           {L("/users", t.users, can("core.users.view"))}
           {L("/roles", t.roles, can("core.roles.view"))}
           {L("/organization", t.organization, can("core.org.view"))}
@@ -151,6 +153,7 @@ function Shell() {
             <Route path="/purchasing/receipts" element={<PurchaseReceipts />} />
             <Route path="/purchasing/invoices" element={<SupplierInvoices />} />
             <Route path="/field" element={<RepApp />} />
+            <Route path="/import" element={<Import />} />
             <Route path="/distribution/reps" element={<Reps />} />
             <Route path="/distribution/performance" element={<Performance />} />
             <Route path="/distribution/settlements" element={<Settlements />} />

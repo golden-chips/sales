@@ -18,6 +18,7 @@ import { documentRoutes } from "./modules/erp/documents.routes.js";
 import { erpReportRoutes } from "./modules/erp/reports.routes.js";
 import { mfgRoutes } from "./modules/mfg/mfg.routes.js";
 import { fieldRoutes } from "./modules/field/field.routes.js";
+import { importRoutes } from "./modules/import/import.routes.js";
 import { pool } from "./db/pool.js";
 
 const PG_MAP: Record<string, [number, string, string, string]> = {
@@ -92,6 +93,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     await v1.register(erpReportRoutes);
     await v1.register(mfgRoutes);
     await v1.register(fieldRoutes);
+    await v1.register(importRoutes);
   }, { prefix: "/api/v1" });
 
   return app;
