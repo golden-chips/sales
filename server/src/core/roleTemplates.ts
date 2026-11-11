@@ -19,8 +19,8 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
   { code: "warehouse_manager", nameAr: "مدير المخازن", nameEn: "Warehouse Manager", grants: ["inventory.items.*", "inventory.stock.*", "inventory.moves.*", "purchasing.receipts.*", "purchasing.suppliers.view", "core.org.view"] },
   // quarantine release is deliberately NOT a warehouse permission: releasing goods after inspection belongs to Quality (food safety SoD),
   { code: "warehouse_worker", nameAr: "أمين/عامل مخزن", nameEn: "Warehouse Worker", grants: ["inventory.moves.create", "inventory.stock.view", "inventory.items.view", "purchasing.receipts.create", "purchasing.receipts.view", "purchasing.suppliers.view"] },
-  { code: "production_manager", nameAr: "مدير الإنتاج", nameEn: "Production Manager", grants: ["manufacturing.*", "inventory.stock.view", "quality.view"] },
-  { code: "production_operator", nameAr: "مشغل إنتاج", nameEn: "Production Operator", grants: ["manufacturing.execution.*"] },
+  { code: "production_manager", nameAr: "مدير الإنتاج", nameEn: "Production Manager", grants: ["manufacturing.*", "inventory.stock.view", "inventory.items.view", "quality.view"] }, // inspection is Quality's job, not production's (SoD)
+  { code: "production_operator", nameAr: "مشغل إنتاج", nameEn: "Production Operator", grants: ["manufacturing.execution.*", "manufacturing.orders.view", "manufacturing.boms.view", "inventory.items.view", "inventory.stock.view"] },
   { code: "hr_manager", nameAr: "مدير الموارد البشرية", nameEn: "HR Manager", grants: ["hr.*", "payroll.*", "core.org.view"] },
   { code: "employee", nameAr: "موظف", nameEn: "Employee", grants: ["hr.self.*"] },
   { code: "quality_manager", nameAr: "مدير الجودة", nameEn: "Quality Manager", grants: ["quality.*", "inventory.stock.view", "inventory.items.view", "inventory.quarantine.release", "inventory.moves.post"] },

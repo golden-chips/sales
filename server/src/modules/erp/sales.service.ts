@@ -125,7 +125,7 @@ export async function createReturn(db: Db, u: UserCtx, b: { invoiceId: string; w
     if (!il) throw E.validation([{ path: "lines", message: "invoice line not found on this invoice" }]);
     await db.query(
       `INSERT INTO sales_return_lines (tenant_id, doc_id, line_no, invoice_line_id, base_qty, amount, cost_amount)
-       VALUES ($1,$2,$3,$4,$5::numeric, round($6::numeric * $5::numeric / $7::numeric, $9), round(coalesce($8::numeric,0) * $5::numeric / $7::numeric, 4))`,
+       VALUES ($1,$2,$3,$4,$5::numeric, round($6::numeric * $5::numeric / $7::numeric, $9), round(coalesce($8::numeric,0) * $5::numeric / $7::numeric, $9))`,
       [u.tenantId, r.id, ++i, il.id, l.qty, il.line_total, il.base_qty, il.cost_amount, m]);
   }
   await db.query("UPDATE sales_returns SET total = (SELECT sum(amount) FROM sales_return_lines WHERE doc_id = $1) WHERE id = $1", [r.id]);
@@ -154,7 +154,7 @@ export async function postReturn(db: Db, u: UserCtx, id: string) {
       if (Number(remaining) <= 0) break;
       const take = (await n(db, "SELECT least($1::numeric, $2::numeric)::text AS t, ($1::numeric - least($1::numeric, $2::numeric))::text AS r", [remaining, o.qty])).t;
       remaining = (await n(db, "SELECT ($1::numeric - $2::numeric)::text AS r", [remaining, take])).r;
-      const value = (await n(db, "SELECT round(coalesce($1::numeric,0) * $2::numeric / $3::numeric, 4)::text AS v", [l.inv_cost, take, l.inv_qty])).v;
+      const value = (await n(db, "SELECT round(coalesce($1::numeric,0) * $2::numeric / $3::numeric, $4)::text AS v", [l.inv_cost, take, l.inv_qty, await minorUnits(db, d.company_id)])).v;
       const v = await stockIn(db, u, { companyId: d.company_id, date: d.return_date, sourceType: "sales_return", sourceId: id, sourceLineId: l.id,
         warehouseId: d.warehouse_id, itemId: l.item_id, lotId: o.lot_id, qty: take, value });
       lineCost = (await n(db, "SELECT ($1::numeric + $2::numeric)::text AS t", [lineCost, v])).t;

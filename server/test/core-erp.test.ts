@@ -22,7 +22,7 @@ describe("core ERP: inventory, purchasing, sales, returns, receipts — with GL 
 
   beforeAll(async () => {
     const p = await platformToken();
-    const plan = await createPlan(p, { modules: ["accounting", "sales", "purchasing", "inventory"] });
+    const plan = await createPlan(p, { modules: ["accounting", "sales", "purchasing", "inventory", "quality"] });
     T = await provision(p, plan.code);
     ok(await api("POST", "/api/v1/accounting/accounts/seed-template", { companyId: T.companyId }, as(T)));
     ok(await api("POST", "/api/v1/accounting/fiscal-years", { companyId: T.companyId, name: `FY${Y}`, startDate: `${Y}-01-01` }, as(T)));
@@ -157,6 +157,13 @@ describe("core ERP: inventory, purchasing, sales, returns, receipts — with GL 
   it("quarantine stock leaves only through a release (permissioned), never a plain transfer", async () => {
     const t = await api("POST", "/api/v1/inventory/documents", { companyId: T.companyId, reason: "transfer", warehouseId: wh.QC, toWarehouseId: wh.MAIN, docDate: D(3, 7), lines: [{ itemId: I.CHIPS.id, qtyDelta: "12" }] }, as(T));
     expect(t.body.error.code).toBe("USE_QUARANTINE_RELEASE");
+    const pending = ok(await api("POST", "/api/v1/inventory/documents", { companyId: T.companyId, reason: "quarantine_release", warehouseId: wh.QC, toWarehouseId: wh.MAIN, docDate: D(3, 7),
+      lines: [{ itemId: I.CHIPS.id, qtyDelta: "10" }] }, as(T)));
+    expect((await api("POST", `/api/v1/inventory/documents/${pending.id}/post`, {}, as(P))).body.error.code).toBe("QC_PASS_REQUIRED"); // no inspection yet
+    await api("DELETE", `/api/v1/inventory/documents/${pending.id}`, undefined, as(T));
+    const lotA = (await stockOf(I.CHIPS.id, wh.QC)).lots[0].lotId;
+    const qc = await api("POST", "/api/v1/quality/checks", { companyId: T.companyId, lotId: lotA, stage: "return", results: [{ parameter: "فحص بصري للتغليف", passed: true }] }, as(P));
+    expect(qc.status).toBe(201);
     const rel = ok(await api("POST", "/api/v1/inventory/documents", { companyId: T.companyId, reason: "quarantine_release", warehouseId: wh.QC, toWarehouseId: wh.MAIN, docDate: D(3, 7),
       notes: "فحص الجودة: سليم", lines: [{ itemId: I.CHIPS.id, qtyDelta: "10" }] }, as(T)));
     const clerk = await createUser(T, [{ roleId: await roleId(T.token, "warehouse_manager") }]); // can post stock documents, but release is a Quality decision

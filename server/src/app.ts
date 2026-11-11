@@ -16,6 +16,7 @@ import { accountingRoutes } from "./modules/accounting/accounting.routes.js";
 import { masterDataRoutes } from "./modules/erp/masterdata.routes.js";
 import { documentRoutes } from "./modules/erp/documents.routes.js";
 import { erpReportRoutes } from "./modules/erp/reports.routes.js";
+import { mfgRoutes } from "./modules/mfg/mfg.routes.js";
 import { pool } from "./db/pool.js";
 
 const PG_MAP: Record<string, [number, string, string, string]> = {
@@ -88,6 +89,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     await v1.register(masterDataRoutes);
     await v1.register(documentRoutes);
     await v1.register(erpReportRoutes);
+    await v1.register(mfgRoutes);
   }, { prefix: "/api/v1" });
 
   return app;

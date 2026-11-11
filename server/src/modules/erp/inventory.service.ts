@@ -136,12 +136,21 @@ export async function postStockDoc(db: Db, u: UserCtx, id: string) {
     const qty = neg ? String(l.qty_delta).slice(1) : String(l.qty_delta);
     const invRole = inventoryRole(from.kind, l.kind);
     if (d.reason === "transfer" || d.reason === "quarantine_release") {
-      const out = await stockOut(db, u, { ...src, sourceLineId: l.id, warehouseId: from.id, itemId: l.item_id, lotId: l.lot_id, qty, trackLots: l.track_lots, itemCode: l.code });
+      const out = await stockOut(db, u, { ...src, sourceLineId: l.id, warehouseId: from.id, itemId: l.item_id, lotId: l.lot_id, qty, trackLots: l.track_lots, itemCode: l.code,
+        forSale: d.reason === "quarantine_release" });
+      if (d.reason === "quarantine_release") {
+        // food safety: a tracked lot leaves quarantine only if its latest quality check passed
+        for (const a of out.allocations) {
+          if (!a.lotId) continue;
+          const qc = (await db.query("SELECT l.lot_no, (SELECT result FROM quality_checks q WHERE q.lot_id = l.id ORDER BY checked_at DESC LIMIT 1) AS result FROM lots l WHERE l.id = $1", [a.lotId])).rows[0];
+          if (qc.result !== "pass") throw E.rule("QC_PASS_REQUIRED", `لا يمكن الإفراج عن التشغيلة ${qc.lot_no} قبل نجاح فحص الجودة`, `Lot ${qc.lot_no} cannot be released without a passed quality check`, { lot: qc.lot_no, lastResult: qc.result });
+        }
+      }
       // the value moves with the goods; the last lot slice takes the rounding remainder so stock value == GL exactly
       let left = out.value;
       for (const [k, a] of out.allocations.entries()) {
         const value = k === out.allocations.length - 1 ? left
-          : (await n(db, "SELECT round($1::numeric * $2::numeric / $3::numeric, 4)::text AS v", [out.value, a.qty, qty])).v;
+          : (await n(db, "SELECT round($1::numeric * $2::numeric / $3::numeric, $4)::text AS v", [out.value, a.qty, qty, await minorUnits(db, d.company_id)])).v;
         left = (await n(db, "SELECT ($1::numeric - $2::numeric)::text AS r", [left, value])).r;
         await stockIn(db, u, { ...src, sourceLineId: l.id, warehouseId: to!.id, itemId: l.item_id, lotId: a.lotId, qty: a.qty, value });
       }
