@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api, getSession } from "../../api";
+import { API_BASE, api, getSession } from "../../api";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
 import { ErrorBox, Loading, errMsg, useAsync, useToast } from "../../ui";
@@ -21,7 +21,7 @@ export default function Import() {
   const k = kinds.data?.find((x: any) => x.kind === kind);
 
   const download = async () => {
-    const r = await fetch(`/api/v1/import/templates/${kind}`, { headers: { authorization: `Bearer ${getSession("tenant")?.accessToken}` } });
+    const r = await fetch(`${API_BASE}/api/v1/import/templates/${kind}`, { headers: { authorization: `Bearer ${getSession("tenant")?.accessToken}` } });
     if (!r.ok) return toast(tt("تعذر تنزيل القالب", "Template download failed"), true);
     const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = `golden-erp-${kind}.xlsx`; a.click(); URL.revokeObjectURL(a.href);
   };

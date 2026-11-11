@@ -6,6 +6,8 @@ export class ApiError extends Error {
 }
 
 type Scope = "tenant" | "platform";
+/** "" on the web (same origin); the server's address inside the Android app (VITE_API_BASE at build time) */
+export const API_BASE = ((import.meta as any).env?.VITE_API_BASE ?? "").replace(/\/$/, "");
 const KEY = { tenant: "ge.session", platform: "ge.platform" };
 
 export interface Session { accessToken: string; refreshToken?: string }
@@ -20,7 +22,7 @@ let refreshing: Promise<boolean> | null = null;
 async function refresh(): Promise<boolean> {
   const s = getSession("tenant");
   if (!s?.refreshToken) return false;
-  refreshing ??= fetch("/api/v1/auth/refresh", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ refreshToken: s.refreshToken }) })
+  refreshing ??= fetch(`${API_BASE}/api/v1/auth/refresh`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ refreshToken: s.refreshToken }) })
     .then(async (r) => { if (!r.ok) { setSession("tenant", null); return false; } const j = await r.json(); setSession("tenant", { accessToken: j.accessToken, refreshToken: j.refreshToken }); return true; })
     .finally(() => { refreshing = null; });
   return refreshing;
@@ -34,7 +36,7 @@ export async function request<T = any>(method: string, path: string, body?: unkn
     if (body !== undefined) headers["content-type"] = "application/json";
     if (s) headers.authorization = `Bearer ${s.accessToken}`;
     if (opts.idempotencyKey) headers["idempotency-key"] = opts.idempotencyKey;
-    return fetch(`/api/v1${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    return fetch(`${API_BASE}/api/v1${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   };
   let res = await go();
   if (res.status === 401 && scope === "tenant" && getSession("tenant")?.refreshToken && !path.startsWith("/auth/")) {

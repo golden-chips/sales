@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 — 2026-11-11 — Excel import, Phase 5 (HR & payroll), free trial, Android
+### Added
+- **Excel import** (customers, suppliers, items, opening stock, opening GL balances): official templates with an instructions sheet, keyed headers in any order, per-row validation preview, all-or-nothing import, drafts for opening balances (SoD).
+- **HR & payroll** (migration 008): settings with the «حضوري» defaults, departments (admin vs direct labour), schedules incl. night shifts, employees with sensitive salary/bank fields, company-defined pay components, holidays, leave with balances, ZKTeco iclock endpoint, append-only punches, HR day decisions, loans, payroll prepare → approve (SoD, GL posting per department, loan and rep-shortage recovery) → pay, month lock, self-service portal; pure attendance/pay engine with exact fixed-point money.
+- **Free trial** (migration 009): public signup in one transaction, trial plan chosen by the platform, banner with days left, subscription requests handled from the platform console, expiry → grace → suspension.
+- **Android**: installable PWA (manifest, icons, service worker, offline shell, shortcuts) and a Capacitor Android project with an automatic APK build on GitHub Actions.
+- 39 new tests (122 total).
+### Fixed
+- Re-importing customers without a credit-limit column wiped existing limits.
+- Dependency advisories: Capacitor upgraded to 7.6.10 (critical in 6.x / tar), react-router 6.30.6, exceljs' uuid pinned to a fixed version.
+
 ## 0.4.0 — 2026-11-11 — Phase 4: field sales & distribution
 ### Added
 - Migration 007: territories, sales reps (van warehouse, flat/tiered commission, discount ceiling), routes, monthly targets, visits, idempotent field operations, cash handovers, van day settlements, commission runs, notification outbox, optional GPS policy.

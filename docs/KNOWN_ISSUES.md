@@ -13,7 +13,7 @@
 | K9 | Info | Plan prices are 0 placeholders | Owner decision D4 |
 | K10 | Info | Modules 2b–6 not built; the UI shows only implemented screens and an honest roadmap | Per implementation plan |
 | K11 | Info | Browser E2E is a manual Playwright script, not yet in CI | Add Playwright job |
-| K12 | Medium | **Unexplained intermittent test failure, still open.** Seen 3 times (always the same 2 accounting tests together: a direct `UPDATE` on a posted entry's lines was not rejected, so the trial balance then failed). Each time it happened on the first full run right after code edits + a dev-DB reset; 10+ subsequent runs were clean. Posting itself succeeded (asserted). A diagnostic probe now logs row count, trigger state and DB when it recurs. Not observed outside the test harness | Analyse the probe output on next occurrence |
+| K12 | Medium | **Unexplained intermittent test failure, still open** (update: 4 occurrences in ~35 full runs; a second symptom appeared once in the field-sales suite — a GL balance different from expected — always in full runs, never in isolated files; not reproduced by touching sources). Seen 3 times (always the same 2 accounting tests together: a direct `UPDATE` on a posted entry's lines was not rejected, so the trial balance then failed). Each time it happened on the first full run right after code edits + a dev-DB reset; 10+ subsequent runs were clean. Posting itself succeeded (asserted). A diagnostic probe now logs row count, trigger state and DB when it recurs. Not observed outside the test harness | Analyse the probe output on next occurrence |
 | K13 | Medium | Sales orders & stock reservation, quotations, purchase requisitions/POs/RFQ/approvals not implemented | Phase 2b remainder |
 | K14 | Medium | Supplier invoice must not exceed received value — purchase price variance and landed costs not supported | Phase 2b remainder |
 | K15 | Medium | Return on a fully paid credit invoice is rejected (cash refund flow missing); debit/credit notes missing | Phase 2b remainder |
@@ -27,3 +27,10 @@
 | K23 | Low | Settlement overage on a lot-tracked item is put on the most recently moved lot in the van | Let the supervisor pick the lot |
 
 Legacy systems findings (V1–V10, H1–H6) are in `PHASE0_DISCOVERY_AUDIT.md`; they live in the `van-sales-app` repository and were **not modified** in this phase.
+| K24 | Medium | Self-service signup has no email/phone verification and no CAPTCHA (rate limited only) | Before public launch |
+| K25 | Medium | Statutory payroll rates (social security, income tax) are not configured: each company defines them as pay components after its accountant confirms them | Decision D8 |
+| K26 | Medium | Fingerprint devices cannot authenticate; a registered serial number is the only key (spoofable on the network). Restrict the iclock path to the factory IP at the proxy | Deployment |
+| K27 | Low | Payroll: if earnings are smaller than statutory deductions, deduction line items are not pro-rated (total is capped) | Refine |
+| K28 | Low | Web dependency advisories left: react-router moderate (fix = v7, breaking), vite dev-server high (dev only; fix = vite 6+) | Planned upgrade |
+| K29 | Info | The APK talks to the server set in `GOLDEN_API_BASE`; without hosting (D5) it cannot reach a server | Hosting decision |
+| K30 | Low | HR engine ports the core حضوري rules; rosters/rotating shifts, multiple sites, coverage pay and supervisor tools from حضوري are not ported yet | Phase 5 remainder |

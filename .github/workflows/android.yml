@@ -1,0 +1,33 @@
+name: Android APK
+# Builds an installable debug APK of GOLDEN ERP on every push that touches the web app.
+# Set the repository variable GOLDEN_API_BASE (Settings → Secrets and variables → Actions → Variables)
+# to the public server address, e.g. https://erp.example.com — the app talks to that server.
+on:
+  push:
+    paths: ["web/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults: { run: { working-directory: web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - run: npm ci --no-audit --no-fund
+      - name: Build web assets
+        env:
+          VITE_API_BASE: ${{ vars.GOLDEN_API_BASE }}
+        run: npm run build
+      - run: npx cap sync android
+      - name: Gradle assembleDebug
+        working-directory: web/android
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: golden-erp-debug-apk
+          path: web/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
