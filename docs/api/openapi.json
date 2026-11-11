@@ -1048,6 +1048,952 @@
           }
         }
       }
+    },
+    "/api/v1/customers": {
+      "get": {
+        "summary": "List customers with balances",
+        "tags": [
+          "Master data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create customer",
+        "tags": [
+          "Master data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/customers/{id}": {
+      "patch": {
+        "summary": "Update customer (credit limit, terms, activation)",
+        "tags": [
+          "Master data"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/suppliers": {
+      "get": {
+        "summary": "List suppliers with balances",
+        "tags": [
+          "Master data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create supplier",
+        "tags": [
+          "Master data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/suppliers/{id}": {
+      "patch": {
+        "summary": "Update supplier (credit limit, terms, activation)",
+        "tags": [
+          "Master data"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/customers/{id}/prices": {
+      "put": {
+        "summary": "Replace a customer's special prices",
+        "tags": [
+          "Master data"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/uoms": {
+      "get": {
+        "summary": "Units of measure",
+        "tags": [
+          "Master data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create unit of measure",
+        "tags": [
+          "Master data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/items": {
+      "get": {
+        "summary": "Items with stock on hand and units",
+        "tags": [
+          "Master data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create item (raw, packaging, semi-finished, finished, service)",
+        "tags": [
+          "Master data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/items/{id}": {
+      "patch": {
+        "summary": "Update item price / reorder level / activation",
+        "tags": [
+          "Master data"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/sales/invoices": {
+      "get": {
+        "summary": "List sales_invoices",
+        "tags": [
+          "Sales"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create draft (sales_invoices) — Idempotency-Key supported",
+        "tags": [
+          "Sales"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/sales/invoices/{id}": {
+      "get": {
+        "summary": "Get sales_invoices",
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a draft (sales_invoices)",
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/sales/invoices/{id}/post": {
+      "post": {
+        "summary": "Post (sales_invoices): stock + journal in one transaction; segregation of duties",
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/sales/returns": {
+      "get": {
+        "summary": "List sales_returns",
+        "tags": [
+          "Sales"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create draft (sales_returns) — Idempotency-Key supported",
+        "tags": [
+          "Sales"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/sales/returns/{id}": {
+      "get": {
+        "summary": "Get sales_returns",
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a draft (sales_returns)",
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/sales/returns/{id}/post": {
+      "post": {
+        "summary": "Post (sales_returns): stock + journal in one transaction; segregation of duties",
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/sales/receipts": {
+      "get": {
+        "summary": "List payments",
+        "tags": [
+          "Sales"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create draft (payments) — Idempotency-Key supported",
+        "tags": [
+          "Sales"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/sales/receipts/{id}": {
+      "get": {
+        "summary": "Get payments",
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a draft (payments)",
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/sales/receipts/{id}/post": {
+      "post": {
+        "summary": "Post (payments): stock + journal in one transaction; segregation of duties",
+        "tags": [
+          "Sales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/purchasing/payments": {
+      "get": {
+        "summary": "List payments",
+        "tags": [
+          "Purchasing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create draft (payments) — Idempotency-Key supported",
+        "tags": [
+          "Purchasing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/purchasing/payments/{id}": {
+      "get": {
+        "summary": "Get payments",
+        "tags": [
+          "Purchasing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a draft (payments)",
+        "tags": [
+          "Purchasing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/purchasing/payments/{id}/post": {
+      "post": {
+        "summary": "Post (payments): stock + journal in one transaction; segregation of duties",
+        "tags": [
+          "Purchasing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/purchasing/receipts": {
+      "get": {
+        "summary": "List purchase_receipts",
+        "tags": [
+          "Purchasing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create draft (purchase_receipts) — Idempotency-Key supported",
+        "tags": [
+          "Purchasing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/purchasing/receipts/{id}": {
+      "get": {
+        "summary": "Get purchase_receipts",
+        "tags": [
+          "Purchasing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a draft (purchase_receipts)",
+        "tags": [
+          "Purchasing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/purchasing/receipts/{id}/post": {
+      "post": {
+        "summary": "Post (purchase_receipts): stock + journal in one transaction; segregation of duties",
+        "tags": [
+          "Purchasing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/purchasing/invoices": {
+      "get": {
+        "summary": "List supplier_invoices",
+        "tags": [
+          "Purchasing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create draft (supplier_invoices) — Idempotency-Key supported",
+        "tags": [
+          "Purchasing"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/purchasing/invoices/{id}": {
+      "get": {
+        "summary": "Get supplier_invoices",
+        "tags": [
+          "Purchasing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a draft (supplier_invoices)",
+        "tags": [
+          "Purchasing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/purchasing/invoices/{id}/post": {
+      "post": {
+        "summary": "Post (supplier_invoices): stock + journal in one transaction; segregation of duties",
+        "tags": [
+          "Purchasing"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/documents": {
+      "get": {
+        "summary": "List stock_documents",
+        "tags": [
+          "Inventory"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create draft (stock_documents) — Idempotency-Key supported",
+        "tags": [
+          "Inventory"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/documents/{id}": {
+      "get": {
+        "summary": "Get stock_documents",
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a draft (stock_documents)",
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/documents/{id}/post": {
+      "post": {
+        "summary": "Post (stock_documents): stock + journal in one transaction; segregation of duties",
+        "tags": [
+          "Inventory"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/stock": {
+      "get": {
+        "summary": "Stock on hand by warehouse/item with average cost, value, lots & expiry",
+        "tags": [
+          "Reports"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/items/{id}/card": {
+      "get": {
+        "summary": "Item card: every movement with running quantity and value, linked to its source document",
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/lots/{id}/trace": {
+      "get": {
+        "summary": "Lot trace: supplier origin, every movement, and the customers who received it",
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/valuation-check": {
+      "get": {
+        "summary": "Reconcile stock subledger value with GL inventory accounts",
+        "tags": [
+          "Reports"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/sales/ar-aging": {
+      "get": {
+        "summary": "Receivables aging per customer (by due date)",
+        "tags": [
+          "Reports"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/customers/{id}/statement": {
+      "get": {
+        "summary": "Customer statement with running balance",
+        "tags": [
+          "Reports"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/sales/analysis": {
+      "get": {
+        "summary": "Sales by item and by customer: quantity, net revenue, cost, gross margin (net of returns)",
+        "tags": [
+          "Reports"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
     }
   },
   "servers": [

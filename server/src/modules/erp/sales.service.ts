@@ -77,7 +77,7 @@ export async function postInvoice(db: Db, u: UserCtx, id: string) {
   for (const l of lines) {
     if (l.kind === "service") continue;
     const out = await stockOut(db, u, { companyId: d.company_id, date: d.invoice_date, sourceType: "sales_invoice", sourceId: id, sourceLineId: l.id,
-      warehouseId: d.warehouse_id, itemId: l.item_id, lotId: l.lot_id, qty: l.base_qty, trackLots: l.track_lots, itemCode: l.code });
+      warehouseId: d.warehouse_id, itemId: l.item_id, lotId: l.lot_id, qty: l.base_qty, trackLots: l.track_lots, itemCode: l.code, forSale: true });
     await db.query("UPDATE sales_invoice_lines SET cost_amount = $2, lot_id = coalesce(lot_id, $3) WHERE id = $1",
       [l.id, out.value, out.allocations.length === 1 ? out.allocations[0].lotId : null]);
     parts.push({ role: "cogs", amount: out.value }, { role: inventoryRole(wh.kind, l.kind), amount: "-" + out.value });

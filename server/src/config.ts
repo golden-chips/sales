@@ -1,7 +1,7 @@
 // All configuration comes from the environment. No secrets in source code.
 function req(name: string): string {
   const v = process.env[name];
-  if (!v) throw new Error(`Missing required environment variable ${name} (see docs/ENVIRONMENT_VARIABLES.md)`);
+  if (!v) throw new Error(`Missing required environment variable ${name} (see docs/INSTALLATION.md §3)`);
   return v;
 }
 function num(name: string, def: number): number {

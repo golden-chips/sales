@@ -9,7 +9,7 @@ Status legend: ✅ written and matches the code · 🟡 partial (covers what exi
 | 3 | Software architecture | [ARCHITECTURE.md](ARCHITECTURE.md) | ✅ |
 | 4 | Database ERD | [DATABASE.md](DATABASE.md) §1 | ✅ |
 | 5 | Database dictionary | [DATABASE.md](DATABASE.md) §3 | ✅ |
-| 6 | API documentation | live: `/api/docs` · file: [api/openapi.json](api/openapi.json) | ✅ (62 operations) |
+| 6 | API documentation | live: `/api/docs` · file: [api/openapi.json](api/openapi.json) | ✅ (116 operations) |
 | 7 | Installation guide | [INSTALLATION.md](INSTALLATION.md) §2 | ✅ |
 | 8 | Deployment guide | [INSTALLATION.md](INSTALLATION.md) §4 | 🟡 baseline; no production env yet |
 | 9 | Environment variables | [INSTALLATION.md](INSTALLATION.md) §3 | ✅ |
@@ -19,12 +19,12 @@ Status legend: ✅ written and matches the code · 🟡 partial (covers what exi
 | 13 | Accounting workflows | [ACCOUNTING_WORKFLOWS.md](ACCOUNTING_WORKFLOWS.md), [MODULE_MAP_AND_INTEGRATIONS.md](MODULE_MAP_AND_INTEGRATIONS.md) | ✅ |
 | 14 | Manufacturing workflows | [MODULE_MAP_AND_INTEGRATIONS.md](MODULE_MAP_AND_INTEGRATIONS.md) rows 5–8 | ⏳ design only (Phase 3) |
 | 15 | HR workflows | [MODULE_MAP_AND_INTEGRATIONS.md](MODULE_MAP_AND_INTEGRATIONS.md) rows 11–12 | ⏳ design only (Phase 5) |
-| 16 | Sales & distribution workflows | [MODULE_MAP_AND_INTEGRATIONS.md](MODULE_MAP_AND_INTEGRATIONS.md) rows 1–4, 13–16 | ⏳ design only (Phases 2b/4) |
+| 16 | Sales, purchasing & inventory workflows | [SALES_PURCHASING_INVENTORY.md](SALES_PURCHASING_INVENTORY.md) | ✅ (field sales/distribution: Phase 4) |
 | 17 | Security documentation | [SECURITY.md](SECURITY.md) | ✅ |
 | 18 | Backup & recovery | [INSTALLATION.md](INSTALLATION.md) §5 | 🟡 procedure written, not drilled |
 | 19 | Troubleshooting | [INSTALLATION.md](INSTALLATION.md) §7 | ✅ |
 | 20 | Testing strategy | [TESTING.md](TESTING.md) | ✅ |
-| 21 | Test results | [TESTING.md](TESTING.md) | ✅ (52/52, real run) |
+| 21 | Test results | [TESTING.md](TESTING.md) | ✅ (69/69, real runs) |
 | 22 | Change log | [CHANGELOG.md](CHANGELOG.md) | ✅ |
 | 23 | Release notes | [RELEASE_NOTES.md](RELEASE_NOTES.md) | ✅ |
 | 24 | Known issues | [KNOWN_ISSUES.md](KNOWN_ISSUES.md) | ✅ |

@@ -45,18 +45,25 @@ export async function stockIn(db: Db, u: UserCtx, s: MoveSource & { warehouseId:
  * no lot is given, quantities are allocated FEFO (earliest expiry first).
  * Returns total cost value and the lot allocations.
  */
-export async function stockOut(db: Db, u: UserCtx, s: MoveSource & { warehouseId: string; itemId: string; lotId?: string | null; qty: string; trackLots: boolean; itemCode: string }) {
+export async function stockOut(db: Db, u: UserCtx, s: MoveSource & { warehouseId: string; itemId: string; lotId?: string | null; qty: string; trackLots: boolean; itemCode: string; forSale?: boolean }) {
   const bal = (await db.query("SELECT qty, value FROM stock_balances WHERE warehouse_id = $1 AND item_id = $2 FOR UPDATE", [s.warehouseId, s.itemId])).rows[0];
   const enough = bal ? (await db.query("SELECT $1::numeric >= $2::numeric AS ok", [bal.qty, s.qty])).rows[0].ok : false;
   if (!enough) throw E.rule("INSUFFICIENT_STOCK", `الكمية غير متوفرة للصنف ${s.itemCode} (المتاح ${bal?.qty ?? 0})`, `Insufficient stock for ${s.itemCode} (available ${bal?.qty ?? 0})`, { itemId: s.itemId, available: bal?.qty ?? "0", requested: s.qty });
 
   let allocations: { lotId: string | null; qty: string }[] = [{ lotId: null, qty: s.qty }];
   if (s.trackLots) {
-    if (s.lotId) allocations = [{ lotId: s.lotId, qty: s.qty }];
-    else {
+    if (s.lotId) {
+      // food safety: an expired lot can be moved (quarantine, write-off) but never sold
+      if (s.forSale) {
+        const exp = (await db.query("SELECT lot_no, expiry_date FROM lots WHERE id = $1 AND expiry_date < $2::date", [s.lotId, s.date])).rows[0];
+        if (exp) throw E.rule("LOT_EXPIRED", `التشغيلة ${exp.lot_no} منتهية الصلاحية (${exp.expiry_date}) ولا يجوز بيعها`, `Lot ${exp.lot_no} expired on ${exp.expiry_date} and cannot be sold`);
+      }
+      allocations = [{ lotId: s.lotId, qty: s.qty }];
+    } else {
       const lots = (await db.query(
         `SELECT lb.lot_id, lb.qty FROM lot_balances lb JOIN lots l ON l.id = lb.lot_id
-          WHERE lb.warehouse_id = $1 AND l.item_id = $2 AND lb.qty > 0 ORDER BY l.expiry_date NULLS LAST, l.created_at FOR UPDATE OF lb`, [s.warehouseId, s.itemId])).rows;
+          WHERE lb.warehouse_id = $1 AND l.item_id = $2 AND lb.qty > 0 AND ($3::boolean IS NOT TRUE OR l.expiry_date IS NULL OR l.expiry_date >= $4::date)
+          ORDER BY l.expiry_date NULLS LAST, l.created_at FOR UPDATE OF lb`, [s.warehouseId, s.itemId, !!s.forSale, s.date])).rows;
       allocations = [];
       let remaining = s.qty;
       for (const l of lots) {
@@ -65,7 +72,8 @@ export async function stockOut(db: Db, u: UserCtx, s: MoveSource & { warehouseId
         allocations.push({ lotId: l.lot_id, qty: take.t });
         remaining = take.r;
       }
-      if (Number(remaining) > 0) throw E.rule("INSUFFICIENT_LOT_STOCK", `كميات التشغيلات غير كافية للصنف ${s.itemCode}`, `Lot quantities are insufficient for ${s.itemCode}`);
+      if (Number(remaining) > 0) throw E.rule("INSUFFICIENT_LOT_STOCK", `كميات التشغيلات الصالحة غير كافية للصنف ${s.itemCode}${s.forSale ? " (التشغيلات المنتهية مستبعدة من البيع)" : ""}`,
+        `Not enough valid lot quantity for ${s.itemCode}${s.forSale ? " (expired lots are excluded from sale)" : ""}`);
     }
     for (const a of allocations) {
       const ok = await db.query("UPDATE lot_balances SET qty = qty - $3 WHERE warehouse_id = $1 AND lot_id = $2 AND qty >= $3", [s.warehouseId, a.lotId, a.qty]);

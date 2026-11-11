@@ -10,6 +10,8 @@ import { hashPassword } from "../src/core/security.js";
 import { provisionTenant } from "../src/modules/platform/platform.service.js";
 import { loadUserCtx } from "../src/core/auth.js";
 import { createFiscalYear, seedChartOfAccounts, createDraft, postEntry, postFromSource } from "../src/modules/accounting/accounting.service.js";
+import { createStockDoc, postStockDoc } from "../src/modules/erp/inventory.service.js";
+import { syncSystemRoles } from "../src/modules/iam/roles.service.js";
 
 const env = (k: string) => { const v = process.env[k]; if (!v) throw new Error(`${k} is required for seeding`); return v; };
 
@@ -69,7 +71,7 @@ async function main() {
   const demo = await withPlatform(async (db) => (await db.query("SELECT id FROM tenants WHERE code = 'demo-foods'")).rows[0]);
   if (!demo) {
     const id = randomUUID();
-    const demoPw = `Demo!${randomUUID().slice(0, 12)}`;
+    const demoPw = process.env.DEMO_OWNER_PASSWORD || `Demo!${randomUUID().slice(0, 12)}`;
     const r = await withPlatformInTenant(id, (db) => provisionTenant(db, id, {
       code: "demo-foods", legalName: "DEMO — شركة أغذية تجريبية", nameEn: "DEMO Foods Co.", industry: "food_manufacturing_distribution",
       baseCurrency: "LYD", timezone: "Africa/Tripoli", defaultLocale: "ar", secondaryLocale: "en", planCode: "manufacturing", billingCycle: "monthly", isDemo: true,
@@ -90,6 +92,37 @@ async function main() {
       const d = await createDraft(db, ctx, { companyId: r.companyId, entryDate: date, memo: "DEMO — قيد مسودة بانتظار الترحيل", isDemo: true,
         lines: [{ accountId: acc["5302"], debit: "85" }, { accountId: acc["1112"], credit: "85" }] });
       void d; void postEntry;
+
+      // DEMO master data + opening stock (every record prefixed DEMO / is_demo)
+      const branch = (await db.query("SELECT id FROM branches LIMIT 1")).rows[0].id;
+      const wh: Record<string, string> = {};
+      for (const [code, kind, ar] of [["DEMO-FG", "finished_goods", "DEMO مخزن المنتج التام"], ["DEMO-QC", "quarantine", "DEMO مخزن الحجر/الفحص"], ["DEMO-RM", "raw_materials", "DEMO مخزن الخامات"]])
+        wh[code] = (await db.query("INSERT INTO warehouses (tenant_id, branch_id, code, name_ar, kind, is_sellable) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id", [id, branch, code, ar, kind, kind === "finished_goods"])).rows[0].id;
+      const u: Record<string, string> = {};
+      for (const [code, ar] of [["BAG", "كيس"], ["CTN", "كرتونة"], ["KG", "كيلو"]]) u[code] = (await db.query("INSERT INTO uoms (tenant_id, code, name_ar) VALUES ($1,$2,$3) RETURNING id", [id, code, ar])).rows[0].id;
+      const item = async (code: string, ar: string, kind: string, uom: string, price: string | null, alt?: [string, string]) => {
+        const row = (await db.query(`INSERT INTO items (tenant_id, company_id, code, name_ar, kind, base_uom_id, track_lots, shelf_life_days, sales_price, reorder_level, is_demo)
+          VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,true) RETURNING id`, [id, r.companyId, code, ar, kind, u[uom], kind === "finished" ? 180 : 365, price, kind === "finished" ? "100" : null])).rows[0];
+        if (alt) await db.query("INSERT INTO item_uoms (tenant_id, item_id, uom_id, factor) VALUES ($1,$2,$3,$4)", [id, row.id, u[alt[0]], alt[1]]);
+        return row.id as string;
+      };
+      const chips = await item("DEMO-CHIPS-40", "DEMO رقائق بطاطس 40غ", "finished", "BAG", "1.250", ["CTN", "24"]);
+      const corn = await item("DEMO-CORN-25", "DEMO رقائق ذرة 25غ", "finished", "BAG", "0.750", ["CTN", "36"]);
+      const oil = await item("DEMO-OIL", "DEMO زيت نباتي", "raw", "KG", null);
+      for (const [code, ar, limit] of [["DEMO-C001", "DEMO سوبرماركت النور", "2000"], ["DEMO-C002", "DEMO بقالة الأمل", "500"], ["DEMO-C003", "DEMO موزع الجنوب", null]])
+        await db.query("INSERT INTO parties (tenant_id, company_id, kind, code, name_ar, credit_limit, payment_terms_days, is_demo) VALUES ($1,$2,'customer',$3,$4,$5,30,true)", [id, r.companyId, code, ar, limit]);
+      await db.query("INSERT INTO parties (tenant_id, company_id, kind, code, name_ar, payment_terms_days, is_demo) VALUES ($1,$2,'supplier','DEMO-S001','DEMO مورد الزيوت',15,true)", [id, r.companyId]);
+      await syncSystemRoles(db, id);
+      const seedCtx = { ...ctx, enforceSod: false }; // seeding only: the system posts its own opening document
+      const y0 = `${y}-01-01`;
+      const op = await createStockDoc(db, seedCtx, { companyId: r.companyId, reason: "opening", warehouseId: wh["DEMO-FG"], docDate: y0, notes: "DEMO رصيد افتتاحي", lines: [
+        { itemId: chips, qtyDelta: "480", unitCost: "0.82", lotNo: "DEMO-L01", productionDate: y0 },
+        { itemId: chips, qtyDelta: "240", unitCost: "0.90", lotNo: "DEMO-L02", productionDate: `${y}-01-15` },
+        { itemId: corn, qtyDelta: "360", unitCost: "0.45", lotNo: "DEMO-L03", productionDate: y0 } ] });
+      await postStockDoc(db, seedCtx, op.id);
+      const op2 = await createStockDoc(db, seedCtx, { companyId: r.companyId, reason: "opening", warehouseId: wh["DEMO-RM"], docDate: y0, notes: "DEMO رصيد افتتاحي خامات",
+        lines: [{ itemId: oil, qtyDelta: "500", unitCost: "4.2", lotNo: "DEMO-OIL-01", expiryDate: `${y + 1}-06-30` }] });
+      await postStockDoc(db, seedCtx, op2.id);
     });
     console.log(`demo-foods provisioned (is_demo). Owner: owner@demo-foods.example / ${demoPw}  (shown once — store it in your password manager)`);
   } else console.log("demo-foods exists");

@@ -229,6 +229,27 @@ describe("core ERP: inventory, purchasing, sales, returns, receipts — with GL 
     expect((await api("DELETE", `/api/v1/sales/invoices/${invoice.id}`, undefined, as(T))).status).toBe(422);
   });
 
+  it("food safety: expired lots are skipped by FEFO and can never be sold explicitly", async () => {
+    const old = ok(await api("POST", "/api/v1/inventory/documents", { companyId: T.companyId, reason: "opening", warehouseId: wh.MAIN, docDate: D(1, 2),
+      lines: [{ itemId: I.CHIPS.id, qtyDelta: "5", unitCost: "0.9", lotNo: "EXPIRED-1", productionDate: `${Y - 1}-01-01`, expiryDate: `${Y - 1}-12-31` }] }, as(T)));
+    await post("/inventory/documents", old.id);
+    const stock = await stockOf(I.CHIPS.id, wh.MAIN);
+    const expired = stock.lots.find((l: any) => l.lotNo === "EXPIRED-1");
+    expect(stock.lots[0].lotNo).toBe("EXPIRED-1"); // earliest expiry first in the stock view …
+    const auto = ok(await api("POST", "/api/v1/sales/invoices", { companyId: T.companyId, warehouseId: wh.MAIN, customerId: cust2.id, invoiceDate: D(3, 20), paymentType: "cash",
+      lines: [{ itemId: I.CHIPS.id, qty: "3", unitPrice: "1" }] }, as(T)));
+    const pa = await post("/sales/invoices", auto.id);
+    expect(pa.lines[0].lot_no).not.toBe("EXPIRED-1"); // … but FEFO for a sale skips it
+    const manual = ok(await api("POST", "/api/v1/sales/invoices", { companyId: T.companyId, warehouseId: wh.MAIN, customerId: cust2.id, invoiceDate: D(3, 20), paymentType: "cash",
+      lines: [{ itemId: I.CHIPS.id, qty: "1", unitPrice: "1", lotId: expired.lotId }] }, as(T)));
+    expect((await api("POST", `/api/v1/sales/invoices/${manual.id}/post`, {}, as(P))).body.error.code).toBe("LOT_EXPIRED");
+    // expired stock can still be written off
+    const wo = ok(await api("POST", "/api/v1/inventory/documents", { companyId: T.companyId, reason: "damage", warehouseId: wh.MAIN, docDate: D(3, 21),
+      lines: [{ itemId: I.CHIPS.id, qtyDelta: "-5", lotId: expired.lotId }] }, as(T)));
+    await post("/inventory/documents", wo.id);
+    expect((await api("GET", `/api/v1/inventory/valuation-check?companyId=${T.companyId}`, undefined, as(T))).body.reconciled).toBe(true);
+  });
+
   it("module gating: a plan without inventory cannot use items", async () => {
     const p = await platformToken();
     const plan = await createPlan(p, { modules: ["accounting"] });

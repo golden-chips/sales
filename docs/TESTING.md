@@ -5,7 +5,7 @@
 | Level | Tooling | Status |
 |---|---|---|
 | Unit | Vitest | Pure helpers are covered through integration tests for now; dedicated unit tests come with Phase 2b costing logic |
-| **Integration (API + DB)** | Vitest + Fastify `inject` + **real PostgreSQL 16**, connecting as the non-superuser `golden_app` role | **52 tests, all passing** |
+| **Integration (API + DB)** | Vitest + Fastify `inject` + **real PostgreSQL 16**, connecting as the non-superuser `golden_app` role | **69 tests, all passing** (see results) |
 | Security | RLS isolation, forged tokens, privilege escalation, SoD, lockout, refresh-token reuse, MFA | Included in the 52 |
 | Accounting | balance, immutability (also by bypassing the service layer), reversal, closed periods, FX rounding, idempotency, trial-balance/ledger/statement reconciliation | Included |
 | SaaS | plan limits, downgrade guard, suspend/reactivate, trial → past_due → suspended sweep | Included |
@@ -90,3 +90,12 @@ Additional checks run in the same session:
 1. Three SQL parameter-type inference errors (lockout counter, reversal source id, period status) → 500 errors. Fixed with explicit casts.
 2. **Design flaw:** the `*.view` wildcard granted the sensitive `core.audit.view` permission to the Read-Only role. Fixed: cross-module view wildcards never include sensitive permissions.
 3. Test-data mistakes (one-character names rejected by validation; a wrong expected FX value) — tests corrected, product behaviour was right.
+
+
+## Results — Phase 2b (2026-11-11)
+
+`test/core-erp.test.ts` — 17 tests covering opening stock and weighted average, SoD on operational documents, goods receipt in alternative units with lots, supplier invoice/payment limits, duplicate supplier invoice numbers, credit sale in cartons with list price × factor and discount, FEFO, exact journal lines per account, credit limit, all-or-nothing rollback on insufficient stock, non-sellable warehouses, returns forced into quarantine and the original lot, over-return, quarantine release permission, damage write-off, FIFO receipts and customer advances, cash sale, **stock subledger = GL**, trial balance, lot trace to customers, AR aging, statement, margin analysis, item card, DB-level immutability, **expired lots never sold**, module gating.
+
+Full suite: **69 / 69 passed** in 7 consecutive full runs after the fixes. One earlier run had 2 failures in the accounting suite that never reproduced (see KNOWN_ISSUES K12).
+
+Browser E2E (demo-foods tenant): owner creates a user and drafts a credit invoice in cartons with a discount → sales manager posts it (journal JV created, lot shown, cost 40.640 = 48 × 0.8467 average) → AR aging → stock on hand ("reconciled with GL") → lot trace showing the customer. **This run uncovered the expired-lot defect**, fixed and covered by a test.

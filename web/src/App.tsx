@@ -15,6 +15,11 @@ import Periods from "./pages/Periods";
 import AuditLog from "./pages/AuditLog";
 import Subscription from "./pages/Subscription";
 import PlatformApp from "./platform/PlatformApp";
+import Parties from "./pages/erp/Parties";
+import Items from "./pages/erp/Items";
+import Stock from "./pages/erp/Stock";
+import SalesInvoices, { ArAging, Receipts, SalesReturns } from "./pages/erp/Sales";
+import PurchaseReceipts, { StockDocuments, SupplierInvoices } from "./pages/erp/Purchasing";
 
 function ThemeToggle() {
   const { t } = useI18n();
@@ -33,7 +38,7 @@ export function TopControls() {
 }
 
 function Shell() {
-  const { t, pick } = useI18n();
+  const { t, pick, tt } = useI18n();
   const { me, can, signOut, companyId, setCompanyId } = useSession();
   const [open, setOpen] = useState(false);
   const loc = useLocation();
@@ -58,7 +63,21 @@ function Shell() {
         <div className="brand"><div className="logo">G</div><div><b>{t.app}</b><small>{pick(me.tenant.legal_name, me.tenant.name_en)}</small></div></div>
         <nav className="nav">
           {L("/", t.dashboard)}
-          {hasAcc && <div className="nav-group">{t.groupFinance}</div>}
+          {me.modules.includes("sales") && <div className="nav-group">{tt("المبيعات", "Sales")}</div>}
+          {L("/sales/invoices", tt("فواتير المبيعات", "Sales invoices"), me.modules.includes("sales") && can("sales.invoices.view"))}
+          {L("/sales/returns", tt("مرتجعات المبيعات", "Sales returns"), me.modules.includes("sales") && can("sales.invoices.view"))}
+          {L("/sales/receipts", tt("سندات القبض", "Customer receipts"), me.modules.includes("sales") && can("sales.invoices.view"))}
+          {L("/customers", tt("العملاء", "Customers"), me.modules.includes("sales") && can("sales.customers.view"))}
+          {L("/sales/aging", tt("أعمار الديون", "AR aging"), me.modules.includes("sales") && can("sales.reports.view"))}
+          {me.modules.includes("purchasing") && <div className="nav-group">{tt("المشتريات", "Purchasing")}</div>}
+          {L("/purchasing/receipts", tt("أذونات الاستلام", "Goods receipts"), me.modules.includes("purchasing") && can("purchasing.receipts.view"))}
+          {L("/purchasing/invoices", tt("فواتير الموردين", "Supplier invoices"), me.modules.includes("purchasing") && can("purchasing.receipts.view"))}
+          {L("/suppliers", tt("الموردون", "Suppliers"), me.modules.includes("purchasing") && can("purchasing.suppliers.view"))}
+          {me.modules.includes("inventory") && <div className="nav-group">{tt("المخازن", "Inventory")}</div>}
+          {L("/inventory/stock", tt("أرصدة المخزون", "Stock on hand"), me.modules.includes("inventory") && can("inventory.stock.view"))}
+          {L("/inventory/items", tt("الأصناف", "Items"), me.modules.includes("inventory") && can("inventory.items.view"))}
+          {L("/inventory/documents", tt("المستندات المخزنية", "Stock documents"), me.modules.includes("inventory") && can("inventory.stock.view"))}
+          {hasAcc && can("accounting.journal.view") && <div className="nav-group">{t.groupFinance}</div>}
           {L("/accounts", t.coa, hasAcc && can("accounting.accounts.view"))}
           {L("/journal", t.journal, hasAcc && can("accounting.journal.view"))}
           {L("/trial-balance", t.trialBalance, hasAcc && can("accounting.reports.view"))}
@@ -100,6 +119,17 @@ function Shell() {
             <Route path="/organization" element={<Organization />} />
             <Route path="/audit" element={<AuditLog />} />
             <Route path="/subscription" element={<Subscription />} />
+            <Route path="/customers" element={<Parties kind="customer" />} />
+            <Route path="/suppliers" element={<Parties kind="supplier" />} />
+            <Route path="/inventory/items" element={<Items />} />
+            <Route path="/inventory/stock" element={<Stock />} />
+            <Route path="/inventory/documents" element={<StockDocuments />} />
+            <Route path="/sales/invoices" element={<SalesInvoices />} />
+            <Route path="/sales/returns" element={<SalesReturns />} />
+            <Route path="/sales/receipts" element={<Receipts />} />
+            <Route path="/sales/aging" element={<ArAging />} />
+            <Route path="/purchasing/receipts" element={<PurchaseReceipts />} />
+            <Route path="/purchasing/invoices" element={<SupplierInvoices />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

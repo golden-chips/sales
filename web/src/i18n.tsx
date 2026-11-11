@@ -47,7 +47,7 @@ const en: Dict = {
 };
 
 type Lang = "ar" | "en";
-const Ctx = createContext<{ t: Dict; lang: Lang; setLang: (l: Lang) => void; pick: (ar?: string | null, en?: string | null) => string }>(null as any);
+const Ctx = createContext<{ t: Dict; lang: Lang; setLang: (l: Lang) => void; pick: (ar?: string | null, en?: string | null) => string; tt: (ar: string, en: string) => string }>(null as any);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLang] = useState<Lang>(() => { try { return (localStorage.getItem("lang") as Lang) || "ar"; } catch { return "ar"; } });
@@ -57,6 +57,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem("lang", lang); } catch { /* storage unavailable: preference not persisted */ }
   }, [lang]);
   const pick = (a?: string | null, e?: string | null) => (lang === "ar" ? a || e : e || a) || "";
-  return <Ctx.Provider value={{ t: lang === "ar" ? ar : en, lang, setLang, pick }}>{children}</Ctx.Provider>;
+  const tt = (a: string, e: string) => (lang === "ar" ? a : e);
+  return <Ctx.Provider value={{ t: lang === "ar" ? ar : en, lang, setLang, pick, tt }}>{children}</Ctx.Provider>;
 }
 export const useI18n = () => useContext(Ctx);

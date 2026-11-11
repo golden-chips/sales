@@ -15,16 +15,14 @@ export function inventoryRole(warehouseKind: string, itemKind: string): string {
   return ITEM_ACCOUNT_ROLE[itemKind] || "inventory_fg";
 }
 
-const roleCache = new WeakMap<Db, Map<string, string>>();
-/** resolves the posting account for a role tag on the company's chart of accounts */
+/**
+ * Resolves the posting account for a role tag on the company's chart of accounts.
+ * Deliberately uncached: pooled connections outlive requests, so a cache here
+ * could serve a deactivated or re-tagged account to a later transaction.
+ */
 export async function accountByRole(db: Db, companyId: string, role: string): Promise<string> {
-  let m = roleCache.get(db);
-  if (!m) { m = new Map(); roleCache.set(db, m); }
-  const k = `${companyId}:${role}`;
-  if (m.has(k)) return m.get(k)!;
   const r = (await db.query("SELECT id FROM accounts WHERE company_id = $1 AND role = $2 AND is_active AND is_postable", [companyId, role])).rows[0];
   if (!r) throw E.rule("ACCOUNT_ROLE_MISSING", `لا يوجد حساب نشط مرتبط بالدور «${role}» في دليل الحسابات`, `No active posting account has the role "${role}" in the chart of accounts`, { role });
-  m.set(k, r.id);
   return r.id;
 }
 

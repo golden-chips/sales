@@ -13,5 +13,11 @@
 | K9 | Info | Plan prices are 0 placeholders | Owner decision D4 |
 | K10 | Info | Modules 2b–6 not built; the UI shows only implemented screens and an honest roadmap | Per implementation plan |
 | K11 | Info | Browser E2E is a manual Playwright script, not yet in CI | Add Playwright job |
+| K12 | Medium | **One unexplained intermittent test failure** (accounting suite: a journal post returned non-200 once in 9 full runs; never reproduced). An assertion now prints the API error if it recurs | Investigate on next occurrence |
+| K13 | Medium | Sales orders & stock reservation, quotations, purchase requisitions/POs/RFQ/approvals not implemented | Phase 2b remainder |
+| K14 | Medium | Supplier invoice must not exceed received value — purchase price variance and landed costs not supported | Phase 2b remainder |
+| K15 | Medium | Return on a fully paid credit invoice is rejected (cash refund flow missing); debit/credit notes missing | Phase 2b remainder |
+| K16 | Low | Serial numbers, bin locations, multiple price lists not implemented | Later |
+| K17 | Low | Some UI inputs (supplier invoice number, unit codes) use browser `prompt()` | Replace with modals |
 
 Legacy systems findings (V1–V10, H1–H6) are in `PHASE0_DISCOVERY_AUDIT.md`; they live in the `van-sales-app` repository and were **not modified** in this phase.

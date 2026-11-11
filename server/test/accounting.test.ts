@@ -87,7 +87,8 @@ describe("general ledger", () => {
 
   it("posted entries and their lines are immutable at the database level", async () => {
     const d = await draft(accountant.token, cashSale("10"));
-    await api("POST", `/api/v1/accounting/journal-entries/${d.body.id}/post`, {}, { token: accountant2.token });
+    const posted = await api("POST", `/api/v1/accounting/journal-entries/${d.body.id}/post`, {}, { token: accountant2.token });
+    expect(posted.status, JSON.stringify(posted.body)).toBe(200);
     await expect(withTenant(T.tenantId, null, (db) => db.query("UPDATE journal_lines SET debit = 999 WHERE entry_id = $1 AND debit > 0", [d.body.id]))).rejects.toThrow(/immutable/);
     await expect(withTenant(T.tenantId, null, (db) => db.query("UPDATE journal_entries SET memo = 'changed' WHERE id = $1", [d.body.id]))).rejects.toThrow(/immutable/);
     await expect(withTenant(T.tenantId, null, (db) => db.query("DELETE FROM journal_entries WHERE id = $1", [d.body.id]))).rejects.toThrow(/cannot be deleted/);
