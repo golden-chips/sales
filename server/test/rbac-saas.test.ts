@@ -7,9 +7,9 @@ describe("RBAC", () => {
   let p: string, T: any;
   beforeAll(async () => { p = await platformToken(); const plan = await createPlan(p); T = await provision(p, plan.code); });
 
-  it("seeds all 20 tenant system roles", async () => {
+  it("seeds all 22 tenant system roles", async () => {
     const r = await api("GET", "/api/v1/roles", undefined, { token: T.token });
-    expect(r.body.filter((x: any) => x.is_system).length).toBe(20);
+    expect(r.body.filter((x: any) => x.is_system).length).toBe(22);
   });
 
   it("read-only user can view but not create", async () => {

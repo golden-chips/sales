@@ -42,3 +42,6 @@ Legacy systems findings (V1–V10, H1–H6) are in `PHASE0_DISCOVERY_AUDIT.md`; 
 | K36 | Medium | BI alerts/schedules are queued to the outbox but not delivered (no e-mail/WhatsApp provider configured); periodic evaluation needs a server cron at deployment — today it is triggered from the UI/API | Hosting (D5) |
 | K37 | Low | No free-form report builder or user-defined dashboards | Later |
 | K38 | Info | Dashboards are computed live; very large data volumes may later need aggregate tables | Monitor after go-live |
+| K39 | Medium | E-approvals are an audit trail (user, time, file SHA-256); a legally qualified digital signature (certificate authority) is not integrated | When a provider is chosen |
+| K40 | Low | Documents are stored inside PostgreSQL (fine for trial/medium volume); large volumes should move to object storage | Before heavy use |
+| K41 | Low | Projects: no Gantt chart, task dependencies or time sheets | Later |

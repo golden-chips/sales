@@ -39,3 +39,4 @@ Status legend: ✅ written and matches the code · 🟡 partial (covers what exi
 | — | Fixed assets & maintenance (Phase 6a) | [ASSETS_MAINTENANCE.md](ASSETS_MAINTENANCE.md) | ✅ |
 | — | Point of sale (Phase 6b) | [POS.md](POS.md) | ✅ |
 | — | BI & reporting (Phase 6c) | [BI_REPORTING.md](BI_REPORTING.md) | ✅ |
+| — | CRM, documents & approvals, projects (Phase 6d) | [CRM_DOCUMENTS_PROJECTS.md](CRM_DOCUMENTS_PROJECTS.md) | ✅ |

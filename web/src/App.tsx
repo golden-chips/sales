@@ -31,6 +31,9 @@ import { Employees, Leaves, MyHr, Payroll } from "./pages/hr/Hr";
 import { AssetRegister, Depreciation, Maintenance } from "./pages/assets/Assets";
 import { PosCounter, PosShifts } from "./pages/pos/Pos";
 import { BiDashboards } from "./pages/bi/Bi";
+import { CrmLeads, CrmPipeline, CrmTickets, CrmMyActivities } from "./pages/crm/Crm";
+import { Documents, ApprovalsInbox } from "./pages/docs/Docs";
+import { ProjectsPage, MyProjectTasks } from "./pages/projects/Projects";
 
 function ThemeToggle() {
   const { t } = useI18n();
@@ -110,6 +113,16 @@ function Shell() {
           {L("/quality/trace", tt("التتبع والاستدعاء", "Trace & recall"), me.modules.includes("quality") && can("quality.view"))}
           {L("/quality/specs", tt("المواصفات و HACCP", "Specs & HACCP"), me.modules.includes("quality") && can("quality.view"))}
           {L("/bi", tt("التقارير وذكاء الأعمال", "BI & reporting"), me.modules.includes("bi") && can("bi.dashboards.view"))}
+          {me.modules.includes("crm") && can("crm.view") && <div className="nav-group">{tt("علاقات العملاء", "CRM")}</div>}
+          {L("/crm/leads", tt("العملاء المحتملون", "Leads"), me.modules.includes("crm") && can("crm.view"))}
+          {L("/crm/pipeline", tt("الفرص البيعية", "Pipeline"), me.modules.includes("crm") && can("crm.view"))}
+          {L("/crm/tickets", tt("الشكاوى والتذاكر", "Tickets"), me.modules.includes("crm") && can("crm.view"))}
+          {L("/crm/activities", tt("متابعاتي", "My follow-ups"), me.modules.includes("crm") && can("crm.view"))}
+          {(me.modules.includes("documents") || me.modules.includes("projects")) && (can("documents.view") || can("projects.view")) && <div className="nav-group">{tt("المستندات والمشاريع", "Documents & projects")}</div>}
+          {L("/documents", tt("المستندات", "Documents"), me.modules.includes("documents") && can("documents.view"))}
+          {L("/approvals", tt("اعتماداتي", "My approvals"), me.modules.includes("documents"))}
+          {L("/projects", tt("المشاريع", "Projects"), me.modules.includes("projects") && can("projects.view"))}
+          {L("/projects/my-tasks", tt("مهامي", "My tasks"), me.modules.includes("projects") && can("projects.view"))}
           {me.modules.includes("pos") && can("pos.shifts.operate") && <div className="nav-group">{tt("نقاط البيع", "Point of sale")}</div>}
           {L("/pos", tt("شاشة البيع", "Sales counter"), me.modules.includes("pos") && can("pos.shifts.operate"))}
           {L("/pos/shifts", tt("الورديات", "Shifts"), me.modules.includes("pos") && can("pos.shifts.operate"))}
@@ -194,6 +207,14 @@ function Shell() {
             <Route path="/assets/depreciation" element={<Depreciation />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/bi" element={<BiDashboards />} />
+            <Route path="/crm/leads" element={<CrmLeads />} />
+            <Route path="/crm/pipeline" element={<CrmPipeline />} />
+            <Route path="/crm/tickets" element={<CrmTickets />} />
+            <Route path="/crm/activities" element={<CrmMyActivities />} />
+            <Route path="/documents" element={<Documents />} />
+            <Route path="/approvals" element={<ApprovalsInbox />} />
+            <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/projects/my-tasks" element={<MyProjectTasks />} />
             <Route path="/pos" element={<PosCounter />} />
             <Route path="/pos/shifts" element={<PosShifts />} />
             <Route path="*" element={<Navigate to="/" replace />} />
