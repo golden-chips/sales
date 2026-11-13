@@ -31,6 +31,7 @@ import { Employees, Leaves, MyHr, Payroll } from "./pages/hr/Hr";
 import { AssetRegister, Depreciation, Maintenance } from "./pages/assets/Assets";
 import { PosCounter, PosShifts } from "./pages/pos/Pos";
 import { BiDashboards } from "./pages/bi/Bi";
+import { Insights } from "./pages/bi/Insights";
 import { CrmLeads, CrmPipeline, CrmTickets, CrmMyActivities } from "./pages/crm/Crm";
 import { Documents, ApprovalsInbox } from "./pages/docs/Docs";
 import { ProjectsPage, MyProjectTasks } from "./pages/projects/Projects";
@@ -113,6 +114,7 @@ function Shell() {
           {L("/quality/trace", tt("التتبع والاستدعاء", "Trace & recall"), me.modules.includes("quality") && can("quality.view"))}
           {L("/quality/specs", tt("المواصفات و HACCP", "Specs & HACCP"), me.modules.includes("quality") && can("quality.view"))}
           {L("/bi", tt("التقارير وذكاء الأعمال", "BI & reporting"), me.modules.includes("bi") && can("bi.dashboards.view"))}
+          {L("/insights", tt("التحليلات الذكية", "Smart insights"), me.modules.includes("bi") && can("bi.insights.view"))}
           {me.modules.includes("crm") && can("crm.view") && <div className="nav-group">{tt("علاقات العملاء", "CRM")}</div>}
           {L("/crm/leads", tt("العملاء المحتملون", "Leads"), me.modules.includes("crm") && can("crm.view"))}
           {L("/crm/pipeline", tt("الفرص البيعية", "Pipeline"), me.modules.includes("crm") && can("crm.view"))}
@@ -207,6 +209,7 @@ function Shell() {
             <Route path="/assets/depreciation" element={<Depreciation />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/bi" element={<BiDashboards />} />
+            <Route path="/insights" element={<Insights />} />
             <Route path="/crm/leads" element={<CrmLeads />} />
             <Route path="/crm/pipeline" element={<CrmPipeline />} />
             <Route path="/crm/tickets" element={<CrmTickets />} />

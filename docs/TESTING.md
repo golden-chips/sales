@@ -119,3 +119,5 @@ Browser E2E (demo-foods): formula with standard cost → create, release, issue 
 Full suite: **92 / 92** in 6 of 8 runs; the 2 failing runs hit the open intermittent issue **K12** (see KNOWN_ISSUES), which has not reproduced since a diagnostic probe was added.
 
 Browser E2E (phone viewport, demo-foods): rep goes offline, records an invoice and a visit (queued, "pending sync"), comes back online → automatic sync, queue empty; the same receipt sent twice → second response `replayed: true` with the same id; totals and custody correct after reload. **The first run of this test exposed that the van held only expired stock and the app displayed it as available — fixed (two rules + demo data).**
+
+> **Note (local development):** PostgreSQL roles are cluster-wide. The test setup sets the password of `golden_app` to `TEST_APP_DB_PASSWORD` (default `test_app_pw`); if the dev and test databases share one PostgreSQL cluster, use the same value in the dev `.env`, otherwise the dev API fails with "password authentication failed" after a test run. Production servers (Docker) have their own cluster and random passwords.

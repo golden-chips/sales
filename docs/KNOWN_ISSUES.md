@@ -45,3 +45,4 @@ Legacy systems findings (V1–V10, H1–H6) are in `PHASE0_DISCOVERY_AUDIT.md`; 
 | K39 | Medium | E-approvals are an audit trail (user, time, file SHA-256); a legally qualified digital signature (certificate authority) is not integrated | When a provider is chosen |
 | K40 | Low | Documents are stored inside PostgreSQL (fine for trial/medium volume); large volumes should move to object storage | Before heavy use |
 | K41 | Low | Projects: no Gantt chart, task dependencies or time sheets | Later |
+| K42 | Info | Arabic AI assistant (natural-language questions on company data) not built: needs a decision on LLM provider, data residency/privacy and cost | Decision needed |

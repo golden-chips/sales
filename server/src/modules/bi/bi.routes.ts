@@ -3,9 +3,10 @@ import { z } from "zod";
 import ExcelJS from "exceljs";
 import { can, tdb } from "../../core/auth.js";
 import { parse, zUuid, zDate } from "../../core/http.js";
-import { AppError } from "../../core/errors.js";
+import { AppError, E as E2 } from "../../core/errors.js";
 import { audit } from "../../core/audit.js";
 import * as bi from "./bi.service.js";
+import * as ins from "./insights.js";
 
 const B = { tags: ["BI & Reporting"] };
 const zArea = z.enum(bi.AREAS);
@@ -139,4 +140,40 @@ export async function biRoutes(app: FastifyInstance) {
       return out;
     });
   });
+  // ---------------------------------------------------------------- smart insights (advisory, read-only)
+  const INSIGHTS: Record<string, { module: string; permission: string; perm2?: string }> = {
+    "slow-stock": { module: "inventory", permission: "inventory.stock.view" },
+    "demand-forecast": { module: "sales", permission: "sales.reports.view" },
+    "purchase-suggestions": { module: "inventory", permission: "inventory.stock.view" },
+    "lapsed-customers": { module: "sales", permission: "sales.reports.view" },
+    "production-cost": { module: "manufacturing", permission: "manufacturing.orders.view" },
+    anomalies: { module: "accounting", permission: "accounting.journal.view", perm2: "bi.anomalies.view" },
+  };
+  app.get("/bi/insights", { schema: { ...B, summary: "Insights available to me" }, preHandler: can("bi.insights.view") }, async (req) => {
+    const u = req.user!;
+    return Object.entries(INSIGHTS).filter(([, a]) => u.modules.has(a.module) && u.permissions.has(a.permission) && (!a.perm2 || u.permissions.has(a.perm2))).map(([k]) => k);
+  });
+  app.get("/bi/insights/:kind", { schema: { ...B, summary: "Advisory analytics with the method used; never changes data" }, preHandler: can("bi.insights.view") }, async (req) => {
+    const { kind } = parse(z.object({ kind: z.enum(Object.keys(INSIGHTS) as [string, ...string[]]) }), req.params);
+    const q = parse(z.object({ companyId: zUuid, asOf: zDate.optional(), days: z.coerce.number().int().min(30).max(730).default(90), leadDays: z.coerce.number().int().min(0).max(180).default(14),
+      safetyDays: z.coerce.number().int().min(0).max(90).default(7), thresholdPct: z.coerce.number().min(1).max(100).default(10) }), req.query);
+    const a = INSIGHTS[kind], u = req.user!;
+    if (!u.modules.has(a.module)) throw E2.moduleNotInPlan(a.module);
+    for (const p of [a.permission, a.perm2]) if (p && !u.permissions.has(p)) throw E2.forbidden(p);
+    const asOf = q.asOf ?? today();
+    return tdb(req, async (db) => {
+      switch (kind) {
+        case "slow-stock": return ins.slowStock(db, q.companyId, asOf, q.days);
+        case "demand-forecast": return ins.demandForecast(db, q.companyId, asOf);
+        case "purchase-suggestions": return ins.purchaseSuggestions(db, q.companyId, asOf, q.leadDays, q.safetyDays);
+        case "lapsed-customers": return ins.lapsedCustomers(db, q.companyId, asOf);
+        case "production-cost": return ins.productionCostDrift(db, q.companyId, asOf, q.thresholdPct);
+        default: {
+          const hs = (await db.query("SELECT weekend_days FROM hr_settings WHERE company_id = $1", [q.companyId])).rows[0];
+          return ins.anomalies(db, q.companyId, asOf, hs?.weekend_days ?? [5]);
+        }
+      }
+    });
+  });
+
 }

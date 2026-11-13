@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 — 2026-11-13 — Phase 6 (advanced modules) and server deployment
+### Added
+- **Fixed assets & maintenance** (migration 010): categories with explicit GL accounts, capitalization incl. assets in use at go-live, sequential monthly depreciation (straight line / double declining), disposal with gain/loss, preventive plans and work orders with spare parts, reliability summary (MTBF).
+- **Point of sale** (migration 011): registers, cashier shifts, sales by barcode as real sales invoices, split cash/card/on-account payment, duplicate-safe retries, returns into quarantine, cash drops, Z close with over/short, 80 mm receipt.
+- **BI** (migration 012): nine live dashboards with comparison and filters, drill-down, Excel/CSV export, print/PDF, threshold alerts and scheduled reports (queued).
+- **CRM, documents & approvals, projects** (migration 013): leads → customers, pipeline, follow-ups, service tickets with SLA and satisfaction (complaints can open a quality NCR); versioned documents with SHA-256, restricted documents, expiry; multi-step e-approvals recording the approved file hash; projects with their own cost centre (budget vs actual from the GL) and tasks.
+- **Smart insights** (migration 014): slow stock, demand forecast, purchase suggestions, lapsed customers, production cost drift, unusual entries for review — advisory only, method shown.
+- **One-command deployment**: Docker images, compose with optional automatic HTTPS, setup/backup/update scripts, Arabic guide; CI installs the stack on every push.
+- Roles: maintenance manager/technician, cashier, POS supervisor, customer service, project manager (22 system roles).
+### Fixed
+- Production container skipped `tsx` (found by testing the installation); insights tab crash when switching tabs; KPI tile markup on new pages.
+
 ## 0.5.1 — 2026-11-11
 ### Fixed
 - **K12 (read-your-writes race):** routes using `Idempotency-Key` sent the HTTP response before the transaction committed, so an immediate follow-up request could read stale data. This caused intermittent local failures and consistent GitHub CI failures (4 tests in `core-erp`). The response is now sent only after COMMIT. A regression assertion was added, and the K12 diagnostic probe was removed.

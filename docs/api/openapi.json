@@ -241,6 +241,88 @@
         }
       }
     },
+    "/api/v1/platform/upgrade-requests": {
+      "get": {
+        "summary": "Upgrade / activation requests from tenants",
+        "tags": [
+          "Platform"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/upgrade-requests/{id}/complete": {
+      "post": {
+        "summary": "Activate the requested plan (issues the invoice) and close the request",
+        "tags": [
+          "Platform"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/upgrade-requests/{id}/reject": {
+      "post": {
+        "summary": "Reject an upgrade request",
+        "tags": [
+          "Platform"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/plans/{code}/trial-default": {
+      "post": {
+        "summary": "Make this plan the one self-service trials start on",
+        "tags": [
+          "Platform"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "code",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/v1/platform/subscriptions/sweep": {
       "post": {
         "summary": "Run subscription lifecycle sweep now",
@@ -260,6 +342,48 @@
         "tags": [
           "Platform"
         ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/public/plans": {
+      "get": {
+        "summary": "Public plans and prices",
+        "tags": [
+          "Public"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/public/code-available": {
+      "get": {
+        "summary": "Is a company code free?",
+        "tags": [
+          "Public"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/public/signup": {
+      "post": {
+        "summary": "Self-service trial: creates the company on the default trial plan and signs the owner in",
+        "tags": [
+          "Public"
+        ],
+        "security": [],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -664,6 +788,32 @@
     "/api/v1/subscription": {
       "get": {
         "summary": "Own subscription, plan limits, usage and invoices",
+        "tags": [
+          "Organization"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/subscription/upgrade-request": {
+      "post": {
+        "summary": "Ask the platform to activate / change the subscription (one open request at a time)",
+        "tags": [
+          "Organization"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/subscription/upgrade-requests": {
+      "get": {
+        "summary": "Own upgrade requests",
         "tags": [
           "Organization"
         ],
@@ -2808,6 +2958,2165 @@
         "summary": "Outbound customer notifications (e.g. recall notices)",
         "tags": [
           "Distribution"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/import/kinds": {
+      "get": {
+        "summary": "Importable data kinds and their columns",
+        "tags": [
+          "Import"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/import/templates/{kind}": {
+      "get": {
+        "summary": "Download the Excel template (.xlsx)",
+        "tags": [
+          "Import"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "kind",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/import/{kind}": {
+      "post": {
+        "summary": "Preview (commit=false) or import (commit=true) an Excel file — all rows or none",
+        "tags": [
+          "Import"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "kind",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/departments": {
+      "get": {
+        "summary": "List departments",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create departments",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/schedules": {
+      "get": {
+        "summary": "List work_schedules",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create work_schedules",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/leave-types": {
+      "get": {
+        "summary": "List leave_types",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create leave_types",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/devices": {
+      "get": {
+        "summary": "List attendance_devices",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create attendance_devices",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/payroll/components": {
+      "get": {
+        "summary": "List pay_components",
+        "tags": [
+          "Payroll"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create pay_components",
+        "tags": [
+          "Payroll"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/holidays": {
+      "get": {
+        "summary": "Public holidays",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Add a public holiday",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/settings": {
+      "get": {
+        "summary": "Attendance & payroll rules (حضوري defaults)",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update attendance & payroll rules",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/employees": {
+      "get": {
+        "summary": "Employees (salary and bank account masked without hr.salaries.view)",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Hire an employee",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/employees/{id}": {
+      "patch": {
+        "summary": "Update employee / salary (sensitive) / terminate",
+        "tags": [
+          "HR"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/punches": {
+      "post": {
+        "summary": "Manual punch (HR), audited",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/punches/{id}/void": {
+      "post": {
+        "summary": "Void a punch with a reason (never deleted)",
+        "tags": [
+          "HR"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/decisions": {
+      "put": {
+        "summary": "HR decision on an employee-day (excuse, approve overtime, waive late/early)",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/employees/{id}/attendance": {
+      "get": {
+        "summary": "Monthly attendance of an employee (computed with the company rules)",
+        "tags": [
+          "HR"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/unmatched-punches": {
+      "get": {
+        "summary": "Device punches whose badge number matches no employee",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/leave-requests": {
+      "get": {
+        "summary": "Leave requests",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Record a leave request on behalf of an employee",
+        "tags": [
+          "HR"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/leave-requests/{id}/approve": {
+      "post": {
+        "summary": "approve leave (balance checked; not your own)",
+        "tags": [
+          "HR"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/leave-requests/{id}/reject": {
+      "post": {
+        "summary": "reject leave (balance checked; not your own)",
+        "tags": [
+          "HR"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/payroll/loans": {
+      "post": {
+        "summary": "Give an advance/loan (Dr employee advances / Cr cash or bank)",
+        "tags": [
+          "Payroll"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "get": {
+        "summary": "Loans and their recovery",
+        "tags": [
+          "Payroll"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/payroll/runs": {
+      "get": {
+        "summary": "Payroll runs",
+        "tags": [
+          "Payroll"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Prepare (or recalculate) the payroll of a month from attendance",
+        "tags": [
+          "Payroll"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/payroll/runs/{id}": {
+      "get": {
+        "summary": "Payroll run (amounts masked without hr.salaries.view)",
+        "tags": [
+          "Payroll"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/payroll/runs/{id}/approve": {
+      "post": {
+        "summary": "Approve & post payroll (SoD: not the preparer)",
+        "tags": [
+          "Payroll"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/payroll/runs/{id}/pay": {
+      "post": {
+        "summary": "Pay salaries (Dr salaries payable / Cr bank or cash)",
+        "tags": [
+          "Payroll"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/payroll/runs/{id}/payslips/{employeeId}": {
+      "get": {
+        "summary": "Payslip",
+        "tags": [
+          "Payroll"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "employeeId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/me": {
+      "get": {
+        "summary": "My profile, leave balance usage, recent payslips",
+        "tags": [
+          "Employee self-service"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/me/attendance": {
+      "get": {
+        "summary": "My month",
+        "tags": [
+          "Employee self-service"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/me/payslips/{runId}": {
+      "get": {
+        "summary": "My payslip (approved payrolls only)",
+        "tags": [
+          "Employee self-service"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "runId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/me/leave": {
+      "post": {
+        "summary": "Request leave",
+        "tags": [
+          "Employee self-service"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hr/me/punch": {
+      "post": {
+        "summary": "Punch from the app (when the company enables it)",
+        "tags": [
+          "Employee self-service"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/assets/categories": {
+      "get": {
+        "summary": "Asset categories (GL accounts, method, useful life)",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create asset category",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/assets": {
+      "get": {
+        "summary": "Asset register with book values",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create asset card (draft) — defaults from its category",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/assets/{id}": {
+      "get": {
+        "summary": "Asset card with life history (depreciation, maintenance, disposal)",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update location / notes / branch (financial fields freeze at capitalization)",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a draft asset card",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/assets/{id}/capitalize": {
+      "post": {
+        "summary": "Capitalize (posts Dr asset / Cr accumulated b/f / Cr funding)",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/assets/{id}/dispose": {
+      "post": {
+        "summary": "Dispose / sell an asset (gain or loss posted)",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/assets/depreciation-runs": {
+      "get": {
+        "summary": "Depreciation runs",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Prepare (or re-prepare) the depreciation draft of a month",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/assets/depreciation-runs/{id}": {
+      "get": {
+        "summary": "Depreciation run with lines",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a draft depreciation run",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/assets/depreciation-runs/{id}/post": {
+      "post": {
+        "summary": "Post depreciation (Dr expense / Cr accumulated); preparer ≠ poster",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/maintenance/plans": {
+      "get": {
+        "summary": "Preventive maintenance plans (filter: due by date)",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create preventive plan (every N days)",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/maintenance/plans/generate": {
+      "post": {
+        "summary": "Generate work orders for due plans (idempotent)",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/maintenance/orders": {
+      "get": {
+        "summary": "Maintenance work orders",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Report a breakdown (corrective work order)",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/maintenance/orders/{id}": {
+      "get": {
+        "summary": "Work order with parts",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/maintenance/orders/{id}/parts": {
+      "put": {
+        "summary": "Set planned spare parts and the issuing warehouse",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/maintenance/orders/{id}/start": {
+      "post": {
+        "summary": "Start work",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/maintenance/orders/{id}/complete": {
+      "post": {
+        "summary": "Complete: issue parts from stock and post maintenance cost",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/maintenance/orders/{id}/cancel": {
+      "post": {
+        "summary": "Cancel an open work order",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/maintenance/summary": {
+      "get": {
+        "summary": "Reliability & cost per asset: breakdowns, downtime, MTBF, maintenance cost, depreciation",
+        "tags": [
+          "Assets & Maintenance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/pos/registers": {
+      "get": {
+        "summary": "POS registers (with the open shift, if any)",
+        "tags": [
+          "Point of Sale"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create register: sellable warehouse, quarantine returns, drawer/safe/card/over-short accounts, discount limit",
+        "tags": [
+          "Point of Sale"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/pos/registers/{id}/catalog": {
+      "get": {
+        "summary": "Sellable items with price, barcodes and sellable quantity in the register's warehouse",
+        "tags": [
+          "Point of Sale"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/pos/shifts": {
+      "get": {
+        "summary": "Shifts (cashiers see their own; supervisors all)",
+        "tags": [
+          "Point of Sale"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Open my shift (opening float moved from the safe to the drawer)",
+        "tags": [
+          "Point of Sale"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/pos/shifts/current": {
+      "get": {
+        "summary": "My open shift (or null)",
+        "tags": [
+          "Point of Sale"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/pos/shifts/{id}": {
+      "get": {
+        "summary": "X/Z report of a shift",
+        "tags": [
+          "Point of Sale"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/pos/shifts/{id}/sales": {
+      "post": {
+        "summary": "Sell (posted immediately). clientId makes retries safe.",
+        "tags": [
+          "Point of Sale"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/pos/sales/{id}/receipt": {
+      "get": {
+        "summary": "Receipt data for printing",
+        "tags": [
+          "Point of Sale"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/pos/shifts/{id}/returns": {
+      "post": {
+        "summary": "Return & refund (goods go to quarantine)",
+        "tags": [
+          "Point of Sale"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/pos/shifts/{id}/drops": {
+      "post": {
+        "summary": "Cash drop to the main safe",
+        "tags": [
+          "Point of Sale"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/pos/shifts/{id}/close": {
+      "post": {
+        "summary": "Close (Z): counted cash to the safe, over/short posted",
+        "tags": [
+          "Point of Sale"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/bi/dashboards": {
+      "get": {
+        "summary": "Dashboards available to me (by plan and permission)",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/bi/dashboards/{area}": {
+      "get": {
+        "summary": "Live KPIs, comparison, series and tables; filters: period, branch, warehouse",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "area",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/bi/dashboards/{area}/export": {
+      "get": {
+        "summary": "Export a dashboard (KPIs with comparison, series, tables) to Excel or CSV",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "area",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/bi/alert-rules": {
+      "get": {
+        "summary": "Threshold alert rules",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create an alert: KPI of a dashboard above / below a threshold",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/bi/alert-rules/{id}": {
+      "delete": {
+        "summary": "Delete an alert rule",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/bi/alerts": {
+      "get": {
+        "summary": "Evaluate alert rules on month-to-date figures",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/bi/alerts/notify": {
+      "post": {
+        "summary": "Queue notifications for triggered alerts that have a recipient (once per day per rule)",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/bi/schedules": {
+      "get": {
+        "summary": "Report schedules",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Schedule a dashboard by e-mail (daily / weekly / monthly)",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/bi/schedules/run-due": {
+      "post": {
+        "summary": "Build the snapshots of due schedules and queue them (idempotent per day)",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/bi/insights": {
+      "get": {
+        "summary": "Insights available to me",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/bi/insights/{kind}": {
+      "get": {
+        "summary": "Advisory analytics with the method used; never changes data",
+        "tags": [
+          "BI & Reporting"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "kind",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/campaigns": {
+      "get": {
+        "summary": "Campaigns with lead counts and conversion",
+        "tags": [
+          "CRM"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create campaign",
+        "tags": [
+          "CRM"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/leads": {
+      "get": {
+        "summary": "Leads",
+        "tags": [
+          "CRM"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create lead",
+        "tags": [
+          "CRM"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/leads/{id}/status": {
+      "post": {
+        "summary": "Move a lead (contacted, qualified, lost with reason)",
+        "tags": [
+          "CRM"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/leads/{id}/convert": {
+      "post": {
+        "summary": "Convert a lead into a customer (creates the customer record)",
+        "tags": [
+          "CRM"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/opportunities": {
+      "get": {
+        "summary": "Opportunities",
+        "tags": [
+          "CRM"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create opportunity (for a lead or a customer)",
+        "tags": [
+          "CRM"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/opportunities/{id}/stage": {
+      "post": {
+        "summary": "Move through the pipeline (probability follows the stage unless given)",
+        "tags": [
+          "CRM"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/pipeline": {
+      "get": {
+        "summary": "Pipeline per stage: count, value, weighted value; win rate",
+        "tags": [
+          "CRM"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/activities": {
+      "get": {
+        "summary": "Activities (my open tasks first)",
+        "tags": [
+          "CRM"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Log a call/meeting/visit/note or schedule a task",
+        "tags": [
+          "CRM"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/activities/{id}/done": {
+      "post": {
+        "summary": "Mark an activity done",
+        "tags": [
+          "CRM"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/tickets": {
+      "get": {
+        "summary": "Tickets with SLA status",
+        "tags": [
+          "CRM"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Open a ticket (a product complaint about a lot can open a quality non-conformance)",
+        "tags": [
+          "CRM"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/tickets/{id}/status": {
+      "post": {
+        "summary": "Work on / resolve / close a ticket",
+        "tags": [
+          "CRM"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/tickets/{id}/feedback": {
+      "post": {
+        "summary": "Customer satisfaction (1–5) after resolution",
+        "tags": [
+          "CRM"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/crm/service-stats": {
+      "get": {
+        "summary": "Customer service: open, SLA breaches, average resolution hours, satisfaction",
+        "tags": [
+          "CRM"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/documents": {
+      "get": {
+        "summary": "Search documents (title, tags, file names); filter by record, category, expiry",
+        "tags": [
+          "Documents & approvals"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Upload a document (first version)",
+        "tags": [
+          "Documents & approvals"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{id}": {
+      "get": {
+        "summary": "Document with all its versions",
+        "tags": [
+          "Documents & approvals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{id}/versions": {
+      "post": {
+        "summary": "Upload a new version (old versions are kept, never changed)",
+        "tags": [
+          "Documents & approvals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{id}/versions/{version}/download": {
+      "get": {
+        "summary": "Download a version (logged)",
+        "tags": [
+          "Documents & approvals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "version",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{id}/archive": {
+      "post": {
+        "summary": "Archive (documents are never deleted)",
+        "tags": [
+          "Documents & approvals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/approvals": {
+      "post": {
+        "summary": "Request a multi-step approval on any record (steps by role or user)",
+        "tags": [
+          "Documents & approvals"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "get": {
+        "summary": "Approval requests",
+        "tags": [
+          "Documents & approvals"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/approvals/inbox": {
+      "get": {
+        "summary": "Approvals waiting for me (by my user or one of my roles)",
+        "tags": [
+          "Documents & approvals"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/approvals/{id}": {
+      "get": {
+        "summary": "Approval request with its steps and decisions",
+        "tags": [
+          "Documents & approvals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/approvals/{id}/decide": {
+      "post": {
+        "summary": "Approve or reject the current step (not your own request); records the file hash",
+        "tags": [
+          "Documents & approvals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/approvals/{id}/cancel": {
+      "post": {
+        "summary": "Requester cancels a pending request",
+        "tags": [
+          "Documents & approvals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/projects": {
+      "get": {
+        "summary": "Projects with progress and budget vs actual",
+        "tags": [
+          "Projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create project (creates or links its cost centre)",
+        "tags": [
+          "Projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}": {
+      "get": {
+        "summary": "Project with tasks, cost lines and budget vs actual",
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update status, dates, budget, manager",
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{id}/tasks": {
+      "post": {
+        "summary": "Add task",
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/tasks/{id}": {
+      "patch": {
+        "summary": "Update task progress / status (the assignee may update their own task)",
+        "tags": [
+          "Projects"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/my-tasks": {
+      "get": {
+        "summary": "My open tasks across projects",
+        "tags": [
+          "Projects"
         ],
         "responses": {
           "200": {
