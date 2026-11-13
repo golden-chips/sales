@@ -5124,6 +5124,133 @@
           }
         }
       }
+    },
+    "/api/v1/go-live/readiness": {
+      "get": {
+        "summary": "Go-live readiness computed from the company's data, with links",
+        "tags": [
+          "Go-live & UAT"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/go-live/reconciliation": {
+      "get": {
+        "summary": "Subledgers (customers, suppliers, stock, WIP, POS drawers) vs GL control accounts",
+        "tags": [
+          "Go-live & UAT"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/go-live/opening-documents": {
+      "get": {
+        "summary": "Imported opening receivables/payables awaiting posting",
+        "tags": [
+          "Go-live & UAT"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/go-live/opening-documents/post": {
+      "post": {
+        "summary": "Post all imported opening balances (importer ≠ poster)",
+        "tags": [
+          "Go-live & UAT"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/go-live/signoffs": {
+      "post": {
+        "summary": "Sign off a stage (chart of accounts, opening balances, UAT, go-live) — each needs its own permission",
+        "tags": [
+          "Go-live & UAT"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/go-live/signoffs/revoke": {
+      "post": {
+        "summary": "Revoke a sign-off (with reason)",
+        "tags": [
+          "Go-live & UAT"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/uat/scenarios": {
+      "get": {
+        "summary": "Acceptance scenarios with the latest result of each",
+        "tags": [
+          "Go-live & UAT"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/uat/results": {
+      "post": {
+        "summary": "Record a test result (a failure must describe the problem)",
+        "tags": [
+          "Go-live & UAT"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/uat/results/{key}": {
+      "get": {
+        "summary": "History of one scenario",
+        "tags": [
+          "Go-live & UAT"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
     }
   },
   "servers": [

@@ -46,3 +46,5 @@ Legacy systems findings (V1–V10, H1–H6) are in `PHASE0_DISCOVERY_AUDIT.md`; 
 | K40 | Low | Documents are stored inside PostgreSQL (fine for trial/medium volume); large volumes should move to object storage | Before heavy use |
 | K41 | Low | Projects: no Gantt chart, task dependencies or time sheets | Later |
 | K42 | Info | Arabic AI assistant (natural-language questions on company data) not built: needs a decision on LLM provider, data residency/privacy and cost | Decision needed |
+| K43 | Medium | The Firebase exporter (`tools/old-system-export`) was syntax-checked but not run against the company's live projects (no credentials, by design); the converter and import were tested end to end on a fake export with the same structure | First run with the IT owner present |
+| K44 | Low | Customer special prices, rep PINs, recurring/open schedules and multi-site staff from the old systems are not migrated automatically (listed in the conversion report) | Manual entry |

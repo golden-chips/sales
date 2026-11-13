@@ -9,12 +9,12 @@ Status legend: ✅ written and matches the code · 🟡 partial (covers what exi
 | 3 | Software architecture | [ARCHITECTURE.md](ARCHITECTURE.md) | ✅ |
 | 4 | Database ERD | [DATABASE.md](DATABASE.md) §1 | ✅ |
 | 5 | Database dictionary | [DATABASE.md](DATABASE.md) §3 | ✅ |
-| 6 | API documentation | live: `/api/docs` · file: [api/openapi.json](api/openapi.json) | ✅ (304 operations) |
+| 6 | API documentation | live: `/api/docs` · file: [api/openapi.json](api/openapi.json) | ✅ (313 operations) |
 | 7 | Installation guide | [INSTALLATION.md](INSTALLATION.md) §2 | ✅ |
 | 8 | Deployment guide | [DEPLOYMENT_AR.md](DEPLOYMENT_AR.md) (Docker, one command) + [INSTALLATION.md](INSTALLATION.md) §4 | ✅ tested locally; no production server yet |
 | 9 | Environment variables | [INSTALLATION.md](INSTALLATION.md) §3 | ✅ |
 | 10 | Tenant management guide | [TENANT_MANAGEMENT.md](TENANT_MANAGEMENT.md) | ✅ |
-| 11 | User manual | [ACCOUNTING_WORKFLOWS.md](ACCOUNTING_WORKFLOWS.md) + [TENANT_MANAGEMENT.md](TENANT_MANAGEMENT.md) | 🟡 implemented modules only |
+| 11 | User manual | [TRAINING_AR.md](TRAINING_AR.md) + module guides | ✅ by role |
 | 12 | Admin manual | [TENANT_MANAGEMENT.md](TENANT_MANAGEMENT.md) | ✅ |
 | 13 | Accounting workflows | [ACCOUNTING_WORKFLOWS.md](ACCOUNTING_WORKFLOWS.md), [MODULE_MAP_AND_INTEGRATIONS.md](MODULE_MAP_AND_INTEGRATIONS.md) | ✅ |
 | 14 | Manufacturing & quality workflows | [MANUFACTURING_QUALITY.md](MANUFACTURING_QUALITY.md) | ✅ |
@@ -24,7 +24,7 @@ Status legend: ✅ written and matches the code · 🟡 partial (covers what exi
 | 18 | Backup & recovery | [INSTALLATION.md](INSTALLATION.md) §5 | 🟡 procedure written, not drilled |
 | 19 | Troubleshooting | [INSTALLATION.md](INSTALLATION.md) §7 | ✅ |
 | 20 | Testing strategy | [TESTING.md](TESTING.md) | ✅ |
-| 21 | Test results | [TESTING.md](TESTING.md) | ✅ (150/150, real runs) |
+| 21 | Test results | [TESTING.md](TESTING.md) | ✅ (163/163, real runs) |
 | 22 | Change log | [CHANGELOG.md](CHANGELOG.md) | ✅ |
 | 23 | Release notes | [RELEASE_NOTES.md](RELEASE_NOTES.md) | ✅ |
 | 24 | Known issues | [KNOWN_ISSUES.md](KNOWN_ISSUES.md) | ✅ |
@@ -41,3 +41,5 @@ Status legend: ✅ written and matches the code · 🟡 partial (covers what exi
 | — | BI & reporting (Phase 6c) | [BI_REPORTING.md](BI_REPORTING.md) | ✅ |
 | — | CRM, documents & approvals, projects (Phase 6d) | [CRM_DOCUMENTS_PROJECTS.md](CRM_DOCUMENTS_PROJECTS.md) | ✅ |
 | — | Smart insights (Phase 6e) | [INSIGHTS.md](INSIGHTS.md) | ✅ |
+| — | Go-live plan & cut-over (Phase 7) | [GO_LIVE_AR.md](GO_LIVE_AR.md) | ✅ |
+| — | Training by role | [TRAINING_AR.md](TRAINING_AR.md) | ✅ |

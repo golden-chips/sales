@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0 — 2026-11-13 — Phase 7 (go-live tooling)
+### Added
+- **Go-live readiness** computed from the company's data, with links; **sign-offs** (chart of accounts, opening balances — refused unless reconciled, UAT, go-live — refused while items block).
+- **Reconciliation** of every subledger with its GL control account (receivables, customer advances, payables, stock by account role, WIP, POS drawers); asserted at the end of the POS, core ERP, assets, field sales, manufacturing and payroll test scenarios.
+- **Opening customer/supplier balances** as real open documents (migration 015): Excel templates, drafts posted by another user on the cut-over date, original dates kept for ageing. The GL opening import refuses AR/AP control accounts.
+- **UAT**: 25 Arabic scenarios by role, results per tester.
+- **Migration from the old Firebase systems**: read-only exporter + converter to the official Excel files with an Arabic report; employees import kind.
+- Docs: `GO_LIVE_AR.md` (cut-over plan, rollback), `TRAINING_AR.md` (by role).
+### Fixed
+- Customer statement showed the cash/card part of a POS sale made partly on account as still owed.
+
 ## 0.6.0 — 2026-11-13 — Phase 6 (advanced modules) and server deployment
 ### Added
 - **Fixed assets & maintenance** (migration 010): categories with explicit GL accounts, capitalization incl. assets in use at go-live, sequential monthly depreciation (straight line / double declining), disposal with gain/loss, preventive plans and work orders with spare parts, reliability summary (MTBF).
