@@ -1,0 +1,8 @@
+{
+  "name": "golden-erp-old-system-export",
+  "private": true,
+  "type": "module",
+  "description": "Read-only export of the old Firebase systems (van sales + Hudoori) to JSON, for conversion into GOLDEN ERP import files",
+  "scripts": { "export": "node export.mjs" },
+  "dependencies": { "firebase-admin": "^12.7.0" }
+}

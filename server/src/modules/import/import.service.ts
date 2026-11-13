@@ -12,7 +12,7 @@ import { audit } from "../../core/audit.js";
 import { createStockDoc } from "../erp/inventory.service.js";
 import { createDraft } from "../accounting/accounting.service.js";
 
-export type Kind = "customers" | "suppliers" | "items" | "opening_stock" | "opening_balances" | "customer_balances" | "supplier_balances";
+export type Kind = "customers" | "suppliers" | "items" | "opening_stock" | "opening_balances" | "customer_balances" | "supplier_balances" | "employees";
 type Col = { key: string; ar: string; en: string; required?: boolean; type?: "text" | "number" | "int" | "date" | "bool"; example?: string; hint?: string };
 
 const PARTY: Col[] = [
@@ -66,6 +66,18 @@ export const TEMPLATES: Record<Kind, { titleAr: string; permission: string; cols
   // receivables / payables brought forward as open documents (not as a GL line), so ageing and statements agree with the GL
   customer_balances: { titleAr: "أرصدة العملاء الافتتاحية (ديون قائمة)", permission: "accounting.journal.create", cols: OPEN_ITEM },
   supplier_balances: { titleAr: "أرصدة الموردين الافتتاحية (مستحقات قائمة)", permission: "accounting.journal.create", cols: OPEN_ITEM },
+  employees: { titleAr: "الموظفون", permission: "hr.employees.manage", cols: [
+    { key: "code", ar: "رقم الموظف", en: "Employee code", required: true, example: "E001" },
+    { key: "full_name", ar: "الاسم الكامل", en: "Full name", required: true, example: "محمد علي" },
+    { key: "phone", ar: "الهاتف", en: "Phone" },
+    { key: "national_id", ar: "الرقم الوطني", en: "National ID" },
+    { key: "job_title", ar: "المسمى الوظيفي", en: "Job title", example: "مشغل خط" },
+    { key: "department_code", ar: "رمز القسم", en: "Department code", example: "PROD", hint: "يُنشأ القسم تلقائيًا إن لم يوجد" },
+    { key: "department_name", ar: "اسم القسم", en: "Department name", example: "الإنتاج" },
+    { key: "hire_date", ar: "تاريخ التعيين", en: "Hire date", type: "date", required: true, example: "2024-03-01" },
+    { key: "basic_salary", ar: "الراتب الأساسي", en: "Basic salary", type: "number", example: "1350", hint: "يتطلب صلاحية رؤية الرواتب" },
+    { key: "device_pin", ar: "رقم البصمة في الجهاز", en: "Fingerprint device number", example: "17" },
+  ] },
 };
 
 const KIND_ALIASES: Record<string, string> = {
@@ -284,6 +296,42 @@ export async function runImport(db: Db, u: UserCtx, kind: Kind, companyId: strin
           `INSERT INTO supplier_invoices (tenant_id, company_id, supplier_id, supplier_invoice_no, invoice_date, due_date, total, is_opening, created_by)
            VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8)`,
           [u.tenantId, companyId, p.id, v.reference ?? `OPENING-${r.row}`, docDate, v.due_date ?? docDate, v.amount, u.userId]);
+      });
+    }
+  }
+
+  if (kind === "employees") {
+    dup("code"); dup("device_pin");
+    if (clean.some((r) => r.v.basic_salary !== null) && !u.permissions.has("hr.salaries.view"))
+      issues.push({ row: 0, field: "basic_salary", message: "عمود الراتب يتطلب صلاحية رؤية الرواتب — احذف العمود أو استورد بمستخدم مخوّل" });
+    const existing = new Map<string, any>((await db.query("SELECT id, code FROM employees WHERE company_id = $1", [companyId])).rows.map((x) => [x.code, x]));
+    const depts = new Map<string, string>((await db.query("SELECT id, code FROM departments WHERE company_id = $1", [companyId])).rows.map((x) => [x.code, x.id]));
+    for (const r of clean) {
+      if (r.v.code && !/^[A-Z0-9_-]{1,20}$/.test(r.v.code)) issues.push({ row: r.row, field: "code", message: "رقم الموظف: حروف إنجليزية كبيرة وأرقام فقط" });
+      if (r.v.department_code && !/^[A-Z0-9_-]{1,20}$/.test(r.v.department_code)) issues.push({ row: r.row, field: "department_code", message: "رمز القسم: حروف إنجليزية كبيرة وأرقام فقط" });
+      if (!r.v.code) continue;
+      if (existing.has(r.v.code)) updates++; else creates++;
+      const v = r.v;
+      plan.push(async () => {
+        let dep: string | null = null;
+        if (v.department_code) {
+          dep = depts.get(v.department_code) ?? null;
+          if (!dep) {
+            dep = (await db.query("INSERT INTO departments (tenant_id, company_id, code, name_ar) VALUES ($1,$2,$3,$4) RETURNING id", [u.tenantId, companyId, v.department_code, v.department_name ?? v.department_code])).rows[0].id as string;
+            depts.set(v.department_code, dep);
+          }
+        }
+        // re-import updates only the columns present in the file (an absent salary column never wipes salaries)
+        await db.query(
+          `INSERT INTO employees (tenant_id, company_id, code, full_name, phone, national_id, job_title, department_id, hire_date, basic_salary, device_pin)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,coalesce($10::numeric, 0),$11)
+           ON CONFLICT (company_id, code) DO UPDATE SET full_name = EXCLUDED.full_name,
+             phone = CASE WHEN $12 THEN EXCLUDED.phone ELSE employees.phone END, national_id = CASE WHEN $13 THEN EXCLUDED.national_id ELSE employees.national_id END,
+             job_title = CASE WHEN $14 THEN EXCLUDED.job_title ELSE employees.job_title END, department_id = coalesce(EXCLUDED.department_id, employees.department_id),
+             hire_date = EXCLUDED.hire_date, basic_salary = CASE WHEN $15 THEN EXCLUDED.basic_salary ELSE employees.basic_salary END,
+             device_pin = CASE WHEN $16 THEN EXCLUDED.device_pin ELSE employees.device_pin END`,
+          [u.tenantId, companyId, v.code, v.full_name, v.phone, v.national_id, v.job_title, dep, v.hire_date, v.basic_salary, v.device_pin,
+            hasCol("phone"), hasCol("national_id"), hasCol("job_title"), hasCol("basic_salary"), hasCol("device_pin")]);
       });
     }
   }
