@@ -73,7 +73,8 @@ async function main() {
     });
   } else console.log("golden-chips exists");
 
-  // 4. DEMO tenant
+  // 4. DEMO tenant (skip with SEED_DEMO=false, e.g. on the production server)
+  if (process.env.SEED_DEMO === "false") { console.log("demo tenant skipped (SEED_DEMO=false)"); return; }
   const demo = await withPlatform(async (db) => (await db.query("SELECT id FROM tenants WHERE code = 'demo-foods'")).rows[0]);
   if (!demo) {
     const id = randomUUID();

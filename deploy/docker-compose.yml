@@ -1,0 +1,59 @@
+# GOLDEN ERP — trial / production stack.  Start with:  ./setup.sh   (see docs/DEPLOYMENT_AR.md)
+name: golden-erp
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: golden_owner
+      POSTGRES_PASSWORD: ${OWNER_DB_PASSWORD:?run setup.sh}
+      POSTGRES_DB: golden
+      TZ: Africa/Tripoli
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U golden_owner -d golden"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # not published: only the API reaches the database
+
+  api:
+    build: ../server
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      DATABASE_URL: postgres://golden_app:${APP_DB_PASSWORD}@db:5432/golden
+      DATABASE_ADMIN_URL: postgres://golden_owner:${OWNER_DB_PASSWORD}@db:5432/golden
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?run setup.sh}
+      JWT_SECRET: ${JWT_SECRET:?run setup.sh}
+      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:?run setup.sh}
+      CORS_ORIGINS: ${PUBLIC_URL:-http://localhost}
+      LOG_LEVEL: info
+      TZ: Africa/Tripoli
+
+  web:
+    build: ../web
+    restart: unless-stopped
+    depends_on: [api]
+    ports:
+      - "${HTTP_PORT:-80}:80"
+
+  # HTTPS with an automatic Let's Encrypt certificate (needs a domain pointing to the server):
+  #   docker compose --profile https up -d      (setup.sh does this when DOMAIN is set)
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on: [web]
+    ports: ["80:80", "443:443"]
+    command: caddy reverse-proxy --from ${DOMAIN:-localhost} --to web:80
+    volumes:
+      - caddydata:/data
+
+volumes:
+  dbdata:
+  caddydata:

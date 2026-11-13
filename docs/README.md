@@ -11,7 +11,7 @@ Status legend: ✅ written and matches the code · 🟡 partial (covers what exi
 | 5 | Database dictionary | [DATABASE.md](DATABASE.md) §3 | ✅ |
 | 6 | API documentation | live: `/api/docs` · file: [api/openapi.json](api/openapi.json) | ✅ (116 operations) |
 | 7 | Installation guide | [INSTALLATION.md](INSTALLATION.md) §2 | ✅ |
-| 8 | Deployment guide | [INSTALLATION.md](INSTALLATION.md) §4 | 🟡 baseline; no production env yet |
+| 8 | Deployment guide | [DEPLOYMENT_AR.md](DEPLOYMENT_AR.md) (Docker, one command) + [INSTALLATION.md](INSTALLATION.md) §4 | ✅ tested locally; no production server yet |
 | 9 | Environment variables | [INSTALLATION.md](INSTALLATION.md) §3 | ✅ |
 | 10 | Tenant management guide | [TENANT_MANAGEMENT.md](TENANT_MANAGEMENT.md) | ✅ |
 | 11 | User manual | [ACCOUNTING_WORKFLOWS.md](ACCOUNTING_WORKFLOWS.md) + [TENANT_MANAGEMENT.md](TENANT_MANAGEMENT.md) | 🟡 implemented modules only |

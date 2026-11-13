@@ -38,3 +38,16 @@ jobs:
         with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
       - run: npm ci --no-audit --no-fund
       - run: npm run build
+  docker:
+    # the trial/production images must keep building, and the stack must come up and answer
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install with the same script customers use
+        working-directory: deploy
+        run: |
+          ./setup.sh
+          curl -fsS http://localhost/health
+          curl -fsS -o /dev/null http://localhost/
+          ./backup.sh
