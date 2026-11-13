@@ -43,3 +43,4 @@ Status legend: ✅ written and matches the code · 🟡 partial (covers what exi
 | — | Smart insights (Phase 6e) | [INSIGHTS.md](INSIGHTS.md) | ✅ |
 | — | Go-live plan & cut-over (Phase 7) | [GO_LIVE_AR.md](GO_LIVE_AR.md) | ✅ |
 | — | Training by role | [TRAINING_AR.md](TRAINING_AR.md) | ✅ |
+| — | Try it in the browser (Codespaces) | [TRY_IT_AR.md](TRY_IT_AR.md) | ✅ config; not run on GitHub yet |

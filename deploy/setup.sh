@@ -41,13 +41,20 @@ done
 
 # first accounts — created once; passwords are printed ONLY now
 if [ ! -f .accounts-created ]; then
-  ADMIN_PW="Adm!$(rnd 14)"; OWNER_PW="Own!$(rnd 14)"; DEMO_PW="Demo!$(rnd 12)"; REP_PW="Rep!$(rnd 12)"
+  # DEMO_PW / REP_PW may be fixed for a throw-away trial (e.g. Codespaces); real accounts always get random passwords
+  ADMIN_PW="Adm!$(rnd 14)"; OWNER_PW="Own!$(rnd 14)"; DEMO_PW="${DEMO_PW:-Demo!$(rnd 12)}"; REP_PW="${REP_PW:-Rep!$(rnd 12)}"
   docker compose exec -T \
     -e PLATFORM_ADMIN_EMAIL="${PLATFORM_ADMIN_EMAIL:-admin@golden-erp.local}" -e PLATFORM_ADMIN_PASSWORD="$ADMIN_PW" \
     -e GOLDEN_OWNER_EMAIL="${GOLDEN_OWNER_EMAIL:-owner@goldenchips.local}" -e GOLDEN_OWNER_PASSWORD="$OWNER_PW" \
     -e DEMO_OWNER_PASSWORD="$DEMO_PW" -e DEMO_REP_PASSWORD="$REP_PW" -e SEED_DEMO="${SEED_DEMO:-true}" \
     api ./node_modules/.bin/tsx scripts/seed.ts
   touch .accounts-created
+  umask 077
+  { echo "GOLDEN ERP — first logins ($(date -u +%F)). Keep this file private; delete it once the passwords are stored safely."
+    echo "Platform admin : ${PLATFORM_ADMIN_EMAIL:-admin@golden-erp.local} / $ADMIN_PW"
+    echo "Golden Chips   : golden-chips / ${GOLDEN_OWNER_EMAIL:-owner@goldenchips.local} / $OWNER_PW"
+    [ "${SEED_DEMO:-true}" != "false" ] && echo "DEMO company   : demo-foods / owner@demo-foods.example / $DEMO_PW  ·  rep@demo-foods.example / $REP_PW"
+  } > FIRST-LOGIN.txt
   cat <<MSG
 
 ==================================================================

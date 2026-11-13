@@ -1,0 +1,14 @@
+{
+  // Try GOLDEN ERP in the browser with GitHub Codespaces (no server needed).
+  // GitHub → Code → Codespaces → Create codespace. The system builds and starts by itself
+  // (first time ~5–10 minutes) and opens in a new tab. DEMO data only — not for real company data.
+  "name": "GOLDEN ERP — trial",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": { "ghcr.io/devcontainers/features/docker-in-docker:2": {} },
+  "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  "forwardPorts": [80],
+  "portsAttributes": { "80": { "label": "GOLDEN ERP", "onAutoForward": "openBrowser" } },
+  "containerEnv": { "SEED_DEMO": "true", "DEMO_PW": "Demo!Trial2026", "REP_PW": "Rep!Trial2026" },
+  "postStartCommand": "cd deploy && ./setup.sh",
+  "customizations": { "codespaces": { "openFiles": ["docs/TRY_IT_AR.md"] } }
+}
