@@ -91,6 +91,8 @@ describe("point of sale", () => {
     expect(await gl("1121")).toBe("10.0000");
     const aging = (await api("GET", `/api/v1/sales/ar-aging?companyId=${T.companyId}&asOf=${D(3, 1)}`, undefined, as(T))).body;
     expect(aging.rows.find((x: any) => x.code === "C001").total).toBe("20.0000");
+    const st = ok(await api("GET", `/api/v1/customers/${cust.id}/statement?from=${Y}-01-01&to=${Y}-12-31`, undefined, as(T)), 200);
+    expect(st.lines.at(-1).balance).toBe("20.0000");   // the card part paid at the till is credited on the same line (was shown as owed)
     expect((await sell(S, shift2, { customerId: cust.id, lines: [{ itemId: chips.id, qty: "40" }], credit: "50" })).body.error.code).toBe("CREDIT_LIMIT_EXCEEDED");
   });
 
@@ -129,5 +131,10 @@ describe("point of sale", () => {
     const it = cat.find((x: any) => x.code === "FG-CHIPS");
     expect(it.available).toBe("70.0000");
     expect(it.units[0].barcode).toBe("2000000000028");
+  });
+
+  it("subledgers agree with the GL after the whole scenario (go-live reconciliation)", async () => {
+    const r = (await api("GET", `/api/v1/go-live/reconciliation?companyId=${T.companyId}&asOf=${Y + 1}-12-31`, undefined, { token: T.token })).body;
+    expect(r.rows.filter((x: any) => !x.ok)).toEqual([]);
   });
 });

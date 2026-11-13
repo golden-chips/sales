@@ -112,7 +112,11 @@ export async function erpReportRoutes(app: FastifyInstance) {
     return tdb(req, async (db) => {
       const party = (await db.query("SELECT * FROM parties WHERE id = $1", [id])).rows[0];
       if (!party) throw E.notFound("customer");
-      const tx = `SELECT invoice_date AS d, number, 'invoice' AS kind, total AS debit, CASE WHEN payment_type = 'cash' THEN total ELSE 0 END AS credit, id FROM sales_invoices WHERE customer_id = $1 AND status = 'posted'
+      // what was paid at the moment of sale (cash invoices fully; POS sales partly by cash/card) is credited on the same line
+      const tx = `SELECT invoice_date AS d, number, CASE WHEN is_opening THEN 'opening' ELSE 'invoice' END AS kind, total AS debit,
+          CASE WHEN payment_type = 'cash' THEN total
+               WHEN pos_shift_id IS NOT NULL THEN (SELECT coalesce(sum(pp.amount), 0) FROM pos_payments pp WHERE pp.invoice_id = sales_invoices.id AND pp.kind = 'sale' AND pp.tender IN ('cash', 'card'))
+               ELSE 0 END AS credit, id FROM sales_invoices WHERE customer_id = $1 AND status = 'posted'
         UNION ALL SELECT r.return_date, r.number, 'return', CASE WHEN i.payment_type = 'cash' THEN r.total ELSE 0 END, r.total, r.id FROM sales_returns r JOIN sales_invoices i ON i.id = r.invoice_id WHERE i.customer_id = $1 AND r.status = 'posted'
         UNION ALL SELECT payment_date, number, 'receipt', 0, amount, id FROM payments WHERE party_id = $1 AND direction = 'in' AND status = 'posted'`;
       const opening = (await db.query(`SELECT coalesce(sum(debit - credit),0)::text AS o FROM (${tx}) t WHERE d < $2`, [id, q.from])).rows[0].o;

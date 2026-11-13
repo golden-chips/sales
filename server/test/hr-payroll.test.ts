@@ -136,4 +136,9 @@ describe("HR & payroll: device punches → attendance → leave → loan → pay
     expect((await api("GET", `/api/v1/payroll/runs/${run.id}/payslips/${e2.id}`, undefined, as(EMP))).status).toBe(403);
     expect((await api("GET", `/api/v1/accounting/reports/trial-balance?companyId=${T.companyId}&from=${Y}-01-01&to=${Y}-12-31`, undefined, as(T))).body.totals.balanced).toBe(true);
   });
+
+  it("subledgers agree with the GL after the whole scenario (go-live reconciliation)", async () => {
+    const r = (await api("GET", `/api/v1/go-live/reconciliation?companyId=${T.companyId}&asOf=${Number(Y) + 1}-12-31`, undefined, { token: T.token })).body;
+    expect(r.rows.filter((x: any) => !x.ok)).toEqual([]);
+  });
 });

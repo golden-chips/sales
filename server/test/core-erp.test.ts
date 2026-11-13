@@ -263,4 +263,9 @@ describe("core ERP: inventory, purchasing, sales, returns, receipts — with GL 
     const X = await provision(p, plan.code);
     expect((await api("GET", `/api/v1/items?companyId=${X.companyId}`, undefined, { token: X.token })).status).toBe(402);
   });
+
+  it("subledgers agree with the GL after the whole scenario (go-live reconciliation)", async () => {
+    const r = (await api("GET", `/api/v1/go-live/reconciliation?companyId=${T.companyId}&asOf=${Y + 1}-12-31`, undefined, { token: T.token })).body;
+    expect(r.rows.filter((x: any) => !x.ok)).toEqual([]);
+  });
 });

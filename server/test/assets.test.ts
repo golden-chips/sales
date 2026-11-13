@@ -173,4 +173,9 @@ describe("fixed assets & maintenance", () => {
     const other = await provision(p, (await createPlan(p, { modules: ["accounting"] })).code);
     expect((await api("GET", `/api/v1/assets?companyId=${other.companyId}`, undefined, as(other))).status).toBe(402);
   });
+
+  it("subledgers agree with the GL after the whole scenario (go-live reconciliation)", async () => {
+    const r = (await api("GET", `/api/v1/go-live/reconciliation?companyId=${T.companyId}&asOf=${Y + 1}-12-31`, undefined, { token: T.token })).body;
+    expect(r.rows.filter((x: any) => !x.ok)).toEqual([]);
+  });
 });

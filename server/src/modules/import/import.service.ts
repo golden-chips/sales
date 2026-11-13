@@ -12,7 +12,7 @@ import { audit } from "../../core/audit.js";
 import { createStockDoc } from "../erp/inventory.service.js";
 import { createDraft } from "../accounting/accounting.service.js";
 
-export type Kind = "customers" | "suppliers" | "items" | "opening_stock" | "opening_balances";
+export type Kind = "customers" | "suppliers" | "items" | "opening_stock" | "opening_balances" | "customer_balances" | "supplier_balances";
 type Col = { key: string; ar: string; en: string; required?: boolean; type?: "text" | "number" | "int" | "date" | "bool"; example?: string; hint?: string };
 
 const PARTY: Col[] = [
@@ -23,6 +23,13 @@ const PARTY: Col[] = [
   { key: "city", ar: "المدينة", en: "City", example: "طرابلس" },
   { key: "tax_number", ar: "الرقم الضريبي", en: "Tax number" },
   { key: "payment_terms_days", ar: "مدة السداد بالأيام", en: "Payment terms (days)", type: "int", example: "30" },
+];
+const OPEN_ITEM: Col[] = [
+  { key: "party_code", ar: "رمز العميل/المورد", en: "Customer/supplier code", required: true, example: "C001" },
+  { key: "amount", ar: "المبلغ المستحق", en: "Amount outstanding", type: "number", required: true, example: "1250.500", hint: "رصيد مفتوح موجب لكل فاتورة قديمة غير مسددة (أو رصيد واحد للطرف)" },
+  { key: "document_date", ar: "تاريخ الفاتورة الأصلية", en: "Original document date", type: "date", example: "2026-10-15" },
+  { key: "due_date", ar: "تاريخ الاستحقاق", en: "Due date", type: "date", example: "2026-11-15" },
+  { key: "reference", ar: "رقم الفاتورة في النظام القديم", en: "Reference in the old system", example: "INV-4512" },
 ];
 export const TEMPLATES: Record<Kind, { titleAr: string; permission: string; cols: Col[] }> = {
   customers: { titleAr: "العملاء", permission: "sales.customers.manage", cols: [...PARTY, { key: "credit_limit", ar: "حد الائتمان", en: "Credit limit", type: "number", example: "2000", hint: "فارغ = بلا حد" }] },
@@ -56,6 +63,9 @@ export const TEMPLATES: Record<Kind, { titleAr: string; permission: string; cols
     { key: "credit", ar: "دائن", en: "Credit", type: "number" },
     { key: "description", ar: "البيان", en: "Description" },
   ] },
+  // receivables / payables brought forward as open documents (not as a GL line), so ageing and statements agree with the GL
+  customer_balances: { titleAr: "أرصدة العملاء الافتتاحية (ديون قائمة)", permission: "accounting.journal.create", cols: OPEN_ITEM },
+  supplier_balances: { titleAr: "أرصدة الموردين الافتتاحية (مستحقات قائمة)", permission: "accounting.journal.create", cols: OPEN_ITEM },
 };
 
 const KIND_ALIASES: Record<string, string> = {
@@ -233,13 +243,14 @@ export async function runImport(db: Db, u: UserCtx, kind: Kind, companyId: strin
   }
 
   if (kind === "opening_balances") {
-    const accs = new Map<string, any>((await db.query("SELECT id, code, is_postable, is_active FROM accounts WHERE company_id = $1", [companyId])).rows.map((a) => [a.code, a]));
+    const accs = new Map<string, any>((await db.query("SELECT id, code, role, is_postable, is_active FROM accounts WHERE company_id = $1", [companyId])).rows.map((a) => [a.code, a]));
     const lines: any[] = [];
     let dr = 0, cr = 0;
     for (const r of clean) {
       const a = r.v.account_code ? accs.get(r.v.account_code) : null;
       if (r.v.account_code && !a) issues.push({ row: r.row, field: "account_code", message: `حساب غير موجود «${r.v.account_code}»` });
       if (a && (!a.is_postable || !a.is_active)) issues.push({ row: r.row, field: "account_code", message: "حساب تجميعي أو موقوف — استخدم حسابًا تفصيليًا" });
+      if (a && ["ar", "ap"].includes(a.role)) issues.push({ row: r.row, field: "account_code", message: "حساب ذمم: استخدم قالب «أرصدة العملاء/الموردين الافتتاحية» حتى تظهر الديون في كشوف الحسابات وأعمار الديون" });
       const d = Number(r.v.debit ?? 0), c = Number(r.v.credit ?? 0);
       if ((d > 0) === (c > 0)) issues.push({ row: r.row, field: "debit", message: "اكتب مدينًا أو دائنًا (واحدًا فقط)" });
       dr += d; cr += c;
@@ -248,6 +259,33 @@ export async function runImport(db: Db, u: UserCtx, kind: Kind, companyId: strin
     if (Math.round(dr * 10000) !== Math.round(cr * 10000)) issues.push({ row: 0, field: "total", message: `غير متوازن: مدين ${dr.toFixed(3)} ≠ دائن ${cr.toFixed(3)}. أضف الفرق على حساب «أرصدة افتتاحية» (304)` });
     creates = 1;
     plan.push(async () => { await createDraft(db, u, { companyId, entryDate: opts.date ?? new Date().toISOString().slice(0, 10), memo: "استيراد Excel — أرصدة افتتاحية", reference: "IMPORT", lines }); });
+  }
+
+  if (kind === "customer_balances" || kind === "supplier_balances") {
+    const isCust = kind === "customer_balances";
+    const parties = new Map<string, any>((await db.query(`SELECT id, code, payment_terms_days FROM parties WHERE company_id = $1 AND kind IN ($2::party_kind, 'both')`,
+      [companyId, isCust ? "customer" : "supplier"])).rows.map((x) => [x.code, x]));
+    const cur = (await db.query("SELECT base_currency FROM companies WHERE id = $1", [companyId])).rows[0].base_currency;
+    const date = opts.date ?? new Date().toISOString().slice(0, 10);
+    for (const r of clean) {
+      const p = r.v.party_code ? parties.get(r.v.party_code) : null;
+      if (r.v.party_code && !p) issues.push({ row: r.row, field: "party_code", message: `${isCust ? "عميل" : "مورد"} غير موجود «${r.v.party_code}» — استورد ${isCust ? "العملاء" : "الموردين"} أولًا` });
+      if (r.v.amount !== null && Number(r.v.amount) <= 0) issues.push({ row: r.row, field: "amount", message: "المبلغ يجب أن يكون موجبًا (رصيد دائن للعميل يُسجل كسند قبض)" });
+      if (r.v.document_date && r.v.document_date > date) issues.push({ row: r.row, field: "document_date", message: "بعد تاريخ الافتتاح" });
+      if (!p || r.v.amount === null) continue;
+      creates++;
+      const v = r.v, docDate = v.document_date ?? date;
+      plan.push(async () => {
+        if (isCust) await db.query(
+          `INSERT INTO sales_invoices (tenant_id, company_id, customer_id, invoice_date, due_date, payment_type, currency, subtotal, total, is_opening, opening_reference, notes, created_by)
+           VALUES ($1,$2,$3,$4,$5,'credit',$6,$7,$7,true,$8,'رصيد افتتاحي — استيراد',$9)`,
+          [u.tenantId, companyId, p.id, docDate, v.due_date ?? docDate, cur, v.amount, v.reference ?? null, u.userId]);
+        else await db.query(
+          `INSERT INTO supplier_invoices (tenant_id, company_id, supplier_id, supplier_invoice_no, invoice_date, due_date, total, is_opening, created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8)`,
+          [u.tenantId, companyId, p.id, v.reference ?? `OPENING-${r.row}`, docDate, v.due_date ?? docDate, v.amount, u.userId]);
+      });
+    }
   }
 
   const summary = { kind, rows: rows.length, creates, updates, issues: issues.sort((a, b) => a.row - b.row).slice(0, 500), issueCount: issues.length, committed: false };

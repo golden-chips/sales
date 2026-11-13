@@ -102,7 +102,7 @@ async function financial(db: Db, c: Ctx): Promise<Omit<Dashboard, "area" | "filt
 // ------------------------------------------------------------------ sales
 async function salesTotals(db: Db, c: Ctx, from: string, to: string) {
   return row(db,
-    `WITH inv AS (SELECT * FROM sales_invoices WHERE company_id = $1 AND status = 'posted' AND invoice_date BETWEEN $2 AND $3
+    `WITH inv AS (SELECT * FROM sales_invoices WHERE company_id = $1 AND status = 'posted' AND NOT is_opening AND invoice_date BETWEEN $2 AND $3
                     AND ($4::uuid IS NULL OR branch_id = $4) AND ($5::uuid IS NULL OR warehouse_id = $5)),
           ret AS (SELECT r.* FROM sales_returns r JOIN sales_invoices i ON i.id = r.invoice_id WHERE r.company_id = $1 AND r.status = 'posted' AND r.return_date BETWEEN $2 AND $3
                     AND ($4::uuid IS NULL OR i.branch_id = $4) AND ($5::uuid IS NULL OR i.warehouse_id = $5))
@@ -119,7 +119,7 @@ async function sales(db: Db, c: Ctx): Promise<Omit<Dashboard, "area" | "filters"
   const margin = (x: any) => pct(net(x) - (Number(x.cogs) - Number(x.returns_cost)), net(x));
   const avg = (x: any) => (x.invoices ? (Number(x.gross_sales) / x.invoices).toFixed(4) : null);
   const f = [c.companyId, c.from, c.to, c.branchId, c.warehouseId];
-  const invWhere = `i.company_id = $1 AND i.status = 'posted' AND i.invoice_date BETWEEN $2 AND $3 AND ($4::uuid IS NULL OR i.branch_id = $4) AND ($5::uuid IS NULL OR i.warehouse_id = $5)`;
+  const invWhere = `i.company_id = $1 AND i.status = 'posted' AND NOT i.is_opening AND i.invoice_date BETWEEN $2 AND $3 AND ($4::uuid IS NULL OR i.branch_id = $4) AND ($5::uuid IS NULL OR i.warehouse_id = $5)`;
   const overdue = await row(db, `SELECT coalesce(sum(total - amount_paid - amount_returned), 0)::numeric(20,4)::text AS v FROM sales_invoices
       WHERE company_id = $1 AND status = 'posted' AND due_date < $2 AND total - amount_paid - amount_returned > 0 AND ($3::uuid IS NULL OR branch_id = $3)`, [c.companyId, c.to, c.branchId]);
   return {
@@ -223,7 +223,7 @@ async function manufacturing(db: Db, c: Ctx): Promise<Omit<Dashboard, "area" | "
 async function procurement(db: Db, c: Ctx): Promise<Omit<Dashboard, "area" | "filters">> {
   const t = async (from: string, to: string) => row(db, `SELECT (SELECT coalesce(sum(total), 0) FROM purchase_receipts WHERE company_id = $1 AND status = 'posted' AND receipt_date BETWEEN $2 AND $3 AND ($4::uuid IS NULL OR warehouse_id = $4))::numeric(20,4) AS received,
       (SELECT count(*) FROM purchase_receipts WHERE company_id = $1 AND status = 'posted' AND receipt_date BETWEEN $2 AND $3 AND ($4::uuid IS NULL OR warehouse_id = $4))::int AS receipts,
-      (SELECT coalesce(sum(total), 0) FROM supplier_invoices WHERE company_id = $1 AND status = 'posted' AND invoice_date BETWEEN $2 AND $3)::numeric(20,4) AS invoiced`, [c.companyId, from, to, c.warehouseId]);
+      (SELECT coalesce(sum(total), 0) FROM supplier_invoices WHERE company_id = $1 AND status = 'posted' AND NOT is_opening AND invoice_date BETWEEN $2 AND $3)::numeric(20,4) AS invoiced`, [c.companyId, from, to, c.warehouseId]);
   const [cur, prev] = [await t(c.from, c.to), await t(c.prevFrom, c.prevTo)];
   const snap = await row(db, `SELECT (SELECT coalesce(sum(total - amount_paid), 0) FROM supplier_invoices WHERE company_id = $1 AND status = 'posted')::numeric(20,4)::text AS ap_open,
       (SELECT coalesce(sum(total - amount_paid), 0) FROM supplier_invoices WHERE company_id = $1 AND status = 'posted' AND due_date < $2 AND total > amount_paid)::numeric(20,4)::text AS ap_overdue,

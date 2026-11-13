@@ -88,7 +88,7 @@ export async function lapsedCustomers(db: Db, companyId: string, asOf: string) {
             coalesce(sum(i.total) FILTER (WHERE i.invoice_date BETWEEN $2::date - 120 AND $2::date - 31), 0)::numeric(20,4)::text AS value_before,
             max(i.invoice_date)::text AS last_invoice, ($2::date - max(i.invoice_date)) AS days_since
        FROM sales_invoices i JOIN parties p ON p.id = i.customer_id
-      WHERE i.company_id = $1 AND i.status = 'posted' AND i.invoice_date <= $2 AND p.is_active
+      WHERE i.company_id = $1 AND i.status = 'posted' AND NOT i.is_opening AND i.invoice_date <= $2 AND p.is_active
       GROUP BY p.id
      HAVING count(*) FILTER (WHERE i.invoice_date BETWEEN $2::date - 120 AND $2::date - 31) >= 3 AND count(*) FILTER (WHERE i.invoice_date > $2::date - 30) = 0
       ORDER BY sum(i.total) FILTER (WHERE i.invoice_date BETWEEN $2::date - 120 AND $2::date - 31) DESC LIMIT 100`, [companyId, asOf]);

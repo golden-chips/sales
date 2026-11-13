@@ -32,6 +32,7 @@ import { AssetRegister, Depreciation, Maintenance } from "./pages/assets/Assets"
 import { PosCounter, PosShifts } from "./pages/pos/Pos";
 import { BiDashboards } from "./pages/bi/Bi";
 import { Insights } from "./pages/bi/Insights";
+import { GoLive, Uat } from "./pages/golive/GoLive";
 import { CrmLeads, CrmPipeline, CrmTickets, CrmMyActivities } from "./pages/crm/Crm";
 import { Documents, ApprovalsInbox } from "./pages/docs/Docs";
 import { ProjectsPage, MyProjectTasks } from "./pages/projects/Projects";
@@ -138,6 +139,8 @@ function Shell() {
           {L("/trial-balance", t.trialBalance, hasAcc && can("accounting.reports.view"))}
           {L("/periods", t.periods, hasAcc && can("accounting.journal.view"))}
           <div className="nav-group">{t.groupAdmin}</div>
+          {L("/go-live", tt("جاهزية التشغيل", "Go-live readiness"), can("core.golive.view"))}
+          {L("/uat", tt("اختبارات القبول", "Acceptance tests"), can("core.uat.record"))}
           {L("/import", tt("استيراد من Excel", "Import from Excel"), ["sales.customers.manage", "purchasing.suppliers.manage", "inventory.items.manage", "inventory.moves.create", "accounting.journal.create"].some(can))}
           {L("/users", t.users, can("core.users.view"))}
           {L("/roles", t.roles, can("core.roles.view"))}
@@ -209,6 +212,8 @@ function Shell() {
             <Route path="/assets/depreciation" element={<Depreciation />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/bi" element={<BiDashboards />} />
+            <Route path="/go-live" element={<GoLive />} />
+            <Route path="/uat" element={<Uat />} />
             <Route path="/insights" element={<Insights />} />
             <Route path="/crm/leads" element={<CrmLeads />} />
             <Route path="/crm/pipeline" element={<CrmPipeline />} />
