@@ -30,6 +30,7 @@ import Import from "./pages/admin/Import";
 import { Employees, Leaves, MyHr, Payroll } from "./pages/hr/Hr";
 import { AssetRegister, Depreciation, Maintenance } from "./pages/assets/Assets";
 import { PosCounter, PosShifts } from "./pages/pos/Pos";
+import { BiDashboards } from "./pages/bi/Bi";
 
 function ThemeToggle() {
   const { t } = useI18n();
@@ -108,6 +109,7 @@ function Shell() {
           {L("/quality/ncr", tt("عدم المطابقة", "Non-conformance"), me.modules.includes("quality") && can("quality.view"))}
           {L("/quality/trace", tt("التتبع والاستدعاء", "Trace & recall"), me.modules.includes("quality") && can("quality.view"))}
           {L("/quality/specs", tt("المواصفات و HACCP", "Specs & HACCP"), me.modules.includes("quality") && can("quality.view"))}
+          {L("/bi", tt("التقارير وذكاء الأعمال", "BI & reporting"), me.modules.includes("bi") && can("bi.dashboards.view"))}
           {me.modules.includes("pos") && can("pos.shifts.operate") && <div className="nav-group">{tt("نقاط البيع", "Point of sale")}</div>}
           {L("/pos", tt("شاشة البيع", "Sales counter"), me.modules.includes("pos") && can("pos.shifts.operate"))}
           {L("/pos/shifts", tt("الورديات", "Shifts"), me.modules.includes("pos") && can("pos.shifts.operate"))}
@@ -191,6 +193,7 @@ function Shell() {
             <Route path="/assets" element={<AssetRegister />} />
             <Route path="/assets/depreciation" element={<Depreciation />} />
             <Route path="/maintenance" element={<Maintenance />} />
+            <Route path="/bi" element={<BiDashboards />} />
             <Route path="/pos" element={<PosCounter />} />
             <Route path="/pos/shifts" element={<PosShifts />} />
             <Route path="*" element={<Navigate to="/" replace />} />

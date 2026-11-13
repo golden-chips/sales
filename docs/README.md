@@ -38,3 +38,4 @@ Status legend: ✅ written and matches the code · 🟡 partial (covers what exi
 | — | Free trial & customer onboarding (Excel import) | [TRIAL_AND_ONBOARDING.md](TRIAL_AND_ONBOARDING.md) | ✅ |
 | — | Fixed assets & maintenance (Phase 6a) | [ASSETS_MAINTENANCE.md](ASSETS_MAINTENANCE.md) | ✅ |
 | — | Point of sale (Phase 6b) | [POS.md](POS.md) | ✅ |
+| — | BI & reporting (Phase 6c) | [BI_REPORTING.md](BI_REPORTING.md) | ✅ |

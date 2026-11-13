@@ -197,12 +197,12 @@ function ShiftSummary({ r }: { r: any }) {
   const { t, tt } = useI18n();
   const label = (k: string, tn: string) => `${({ sale: tt("بيع", "Sale"), refund: tt("مرتجع", "Refund"), drop: tt("سحب للخزينة", "Drop") } as any)[k]} · ${({ cash: tt("نقدًا", "Cash"), card: tt("بطاقة", "Card"), credit: tt("آجل", "On account") } as any)[tn]}`;
   return <div className="receipt">
-    <div className="kpis">
-      <div className="kpi"><div className="label">{tt("الفواتير", "Invoices")}</div><div className="value num">{r.totals.invoices}</div></div>
-      <div className="kpi"><div className="label">{tt("صافي المبيعات", "Net sales")}</div><div className="value num">{fmt(r.totals.net)}</div></div>
-      <div className="kpi"><div className="label">{tt("الخصومات", "Discounts")}</div><div className="value num">{fmt(r.totals.discounts)}</div></div>
-      <div className="kpi"><div className="label">{tt("النقدية المتوقعة", "Expected cash")}</div><div className="value num">{fmt(r.expectedCash ?? r.shift.expected_cash)}</div></div>
-      {r.shift.status === "closed" && <div className="kpi"><div className="label">{tt("المعدود / الفرق", "Counted / variance")}</div><div className="value num">{fmt(r.shift.counted_cash)} / {fmt(r.shift.variance)}</div></div>}
+    <div className="grid kpis">
+      <div className="card kpi"><div className="label">{tt("الفواتير", "Invoices")}</div><div className="value num">{r.totals.invoices}</div></div>
+      <div className="card kpi"><div className="label">{tt("صافي المبيعات", "Net sales")}</div><div className="value num">{fmt(r.totals.net)}</div></div>
+      <div className="card kpi"><div className="label">{tt("الخصومات", "Discounts")}</div><div className="value num">{fmt(r.totals.discounts)}</div></div>
+      <div className="card kpi"><div className="label">{tt("النقدية المتوقعة", "Expected cash")}</div><div className="value num">{fmt(r.expectedCash ?? r.shift.expected_cash)}</div></div>
+      {r.shift.status === "closed" && <div className="card kpi"><div className="label">{tt("المعدود / الفرق", "Counted / variance")}</div><div className="value num">{fmt(r.shift.counted_cash)} / {fmt(r.shift.variance)}</div></div>}
     </div>
     <p className="num">{tt("عهدة الافتتاح", "Opening float")}: {fmt(r.shift.opening_float)} · {r.shift.number} · {r.shift.cashier}</p>
     {r.byTender.length ? <LinesTable rows={r.byTender} cols={[{ h: tt("الحركة", "Movement"), v: (x) => label(x.kind, x.tender) }, { h: tt("العدد", "Count"), v: (x) => x.n, end: true }, { h: t.amount, v: (x) => fmt(x.amount), end: true }]} /> : null}

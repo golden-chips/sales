@@ -102,7 +102,20 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .receipt hr { border: 0; border-top: 1px dashed var(--line); margin: 6px 0; }
 td.bad { color: var(--bad); }
 @media print {
-  body * { visibility: hidden !important; }
-  .receipt, .receipt * { visibility: visible !important; }
-  .receipt { position: fixed; inset: 0 auto auto 0; width: 80mm; padding: 2mm; color: #000; background: #fff; font-size: 11px; }
+  /* a receipt (POS) prints alone on 80 mm; any other page prints without the navigation */
+  body:has(.modal .receipt) * { visibility: hidden !important; }
+  body:has(.modal .receipt) .modal .receipt, body:has(.modal .receipt) .modal .receipt * { visibility: visible !important; }
+  .modal .receipt { position: fixed; inset: 0 auto auto 0; width: 80mm; padding: 2mm; color: #000; background: #fff; font-size: 11px; }
+  .nav, .no-print, .topbar { display: none !important; }
 }
+
+/* ---- charts (single categorical slot, validated light #2a78d6 on #fff / dark #3987e5 on #171b23) */
+:root { --series-1: #2a78d6; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --series-1: #3987e5; } }
+:root[data-theme="dark"] { --series-1: #3987e5; }
+.viz-tip { position: absolute; transform: translate(-50%, calc(-100% - 8px)); background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 10px; box-shadow: 0 4px 12px rgba(0,0,0,.12); pointer-events: none; white-space: nowrap; }
+.viz svg g:focus { outline: none; }
+.kpis a .kpi:hover { border-color: var(--series-1); }
+
+@media (max-width: 600px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } .kpi .value { font-size: 18px; } }

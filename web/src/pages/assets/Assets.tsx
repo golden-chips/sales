@@ -44,8 +44,8 @@ export function AssetRegister() {
         <option value="draft">{t.draft}</option><option value="active">{tt("مرسمل", "Active")}</option><option value="disposed">{tt("مستبعد", "Disposed")}</option></select>
       {can("assets.register.manage") && <button className="btn" onClick={() => setCats(true)}>{tt("الفئات", "Categories")}</button>}
       {can("assets.register.manage") && <button className="btn primary" onClick={() => setCreating(true)}>{tt("أصل جديد", "New asset")}</button>}</div></div>
-    <div className="kpis"><div className="kpi"><div className="label">{tt("تكلفة الأصول القائمة", "Cost of active assets")}</div><div className="value num">{fmt(totals.cost)}</div></div>
-      <div className="kpi"><div className="label">{tt("القيمة الدفترية", "Book value")}</div><div className="value num">{fmt(totals.book)}</div></div></div>
+    <div className="grid kpis"><div className="card kpi"><div className="label">{tt("تكلفة الأصول القائمة", "Cost of active assets")}</div><div className="value num">{fmt(totals.cost)}</div></div>
+      <div className="card kpi"><div className="label">{tt("القيمة الدفترية", "Book value")}</div><div className="value num">{fmt(totals.book)}</div></div></div>
     <ErrorBox error={list.error} />
     {list.loading ? <Loading /> : !list.data?.length ? <div className="card"><Empty /></div> : <div className="table-wrap"><table>
       <thead><tr><th>{t.code}</th><th>{t.name}</th><th>{tt("النوع", "Kind")}</th><th>{tt("الفئة", "Category")}</th><th>{tt("الموقع", "Location")}</th>
@@ -160,13 +160,13 @@ function AssetCard({ id, onClose }: { id: string; onClose: () => void }) {
     {a?.status === "active" && can("assets.register.dispose") && <button className="btn danger" onClick={() => setDisposing(true)}>{tt("استبعاد / بيع", "Dispose / sell")}</button>}</>}>
     <ErrorBox error={d.error} />
     {!a ? <Loading /> : <>
-      <div className="kpis">
-        <div className="kpi"><div className="label">{tt("التكلفة", "Cost")}</div><div className="value num">{fmt(a.cost)}</div></div>
-        <div className="kpi"><div className="label">{tt("مجمع الإهلاك", "Accumulated")}</div><div className="value num">{fmt(a.accumulated_depreciation)}</div></div>
-        <div className="kpi"><div className="label">{tt("القيمة الدفترية", "Book value")}</div><div className="value num">{fmt(a.book_value)}</div></div>
-        <div className="kpi"><div className="label">{tt("الأشهر", "Months")}</div><div className="value num">{a.months_depreciated} / {a.useful_life_months}</div></div>
-        <div className="kpi"><div className="label">{tt("الأعطال / التوقف (دقيقة)", "Breakdowns / downtime (min)")}</div><div className="value num">{d.data.totals.breakdowns} / {d.data.totals.downtime_minutes}</div></div>
-        <div className="kpi"><div className="label">{tt("تكلفة الصيانة", "Maintenance cost")}</div><div className="value num">{fmt(d.data.totals.maintenance_cost)}</div></div>
+      <div className="grid kpis">
+        <div className="card kpi"><div className="label">{tt("التكلفة", "Cost")}</div><div className="value num">{fmt(a.cost)}</div></div>
+        <div className="card kpi"><div className="label">{tt("مجمع الإهلاك", "Accumulated")}</div><div className="value num">{fmt(a.accumulated_depreciation)}</div></div>
+        <div className="card kpi"><div className="label">{tt("القيمة الدفترية", "Book value")}</div><div className="value num">{fmt(a.book_value)}</div></div>
+        <div className="card kpi"><div className="label">{tt("الأشهر", "Months")}</div><div className="value num">{a.months_depreciated} / {a.useful_life_months}</div></div>
+        <div className="card kpi"><div className="label">{tt("الأعطال / التوقف (دقيقة)", "Breakdowns / downtime (min)")}</div><div className="value num">{d.data.totals.breakdowns} / {d.data.totals.downtime_minutes}</div></div>
+        <div className="card kpi"><div className="label">{tt("تكلفة الصيانة", "Maintenance cost")}</div><div className="value num">{fmt(d.data.totals.maintenance_cost)}</div></div>
       </div>
       <p><StatusBadge s={a.status} /> {a.category_name_ar} · {a.method === "straight_line" ? tt("قسط ثابت", "Straight line") : tt("متناقص مضاعف", "Double declining")} · {tt("بدء الاستخدام", "In service")} {fmtDate(a.in_service_date)}
         {a.serial_no ? ` · S/N ${a.serial_no}` : ""}{a.location ? ` · ${a.location}` : ""}{a.status === "disposed" ? ` · ${tt("استُبعد", "Disposed")} ${fmtDate(a.disposal_date)} (${fmt(a.disposal_proceeds)})` : ""}</p>

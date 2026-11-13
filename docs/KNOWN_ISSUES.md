@@ -39,3 +39,6 @@ Legacy systems findings (V1–V10, H1–H6) are in `PHASE0_DISCOVERY_AUDIT.md`; 
 | K33 | Medium | POS needs a live connection to complete a sale (retries are duplicate-safe via clientId, but there is no offline sales queue like the rep app) | Phase 6 remainder |
 | K34 | Low | POS: no direct card-terminal or cash-drawer integration; card amounts are keyed in; printing uses the OS printer (80 mm layout) | Hardware integration |
 | K35 | Low | POS promotions (buy-X-get-Y), loyalty points and gift cards not implemented | Later |
+| K36 | Medium | BI alerts/schedules are queued to the outbox but not delivered (no e-mail/WhatsApp provider configured); periodic evaluation needs a server cron at deployment — today it is triggered from the UI/API | Hosting (D5) |
+| K37 | Low | No free-form report builder or user-defined dashboards | Later |
+| K38 | Info | Dashboards are computed live; very large data volumes may later need aggregate tables | Monitor after go-live |
