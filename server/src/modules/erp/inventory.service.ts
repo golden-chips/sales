@@ -15,14 +15,14 @@ async function lotDates(db: Db, item: any, productionDate?: string | null, expir
 }
 
 // ------------------------------------------------------------------ goods receipt
-export async function createReceipt(db: Db, u: UserCtx, b: { companyId: string; supplierId: string; warehouseId: string; receiptDate: string; supplierRef?: string;
-  lines: { itemId: string; uomId?: string | null; qty: string; unitCost: string; lotNo?: string; productionDate?: string; expiryDate?: string }[] }) {
+export async function createReceipt(db: Db, u: UserCtx, b: { companyId: string; supplierId: string; warehouseId: string; receiptDate: string; supplierRef?: string; purchaseOrderId?: string | null;
+  lines: { itemId: string; uomId?: string | null; qty: string; unitCost: string; lotNo?: string; productionDate?: string; expiryDate?: string; orderLineId?: string | null }[] }) {
   const s = (await db.query("SELECT * FROM parties WHERE id = $1 AND company_id = $2 AND kind IN ('supplier','both') AND is_active", [b.supplierId, b.companyId])).rows[0];
   if (!s) throw E.validation([{ path: "supplierId", message: "active supplier not found in this company" }]);
   await warehouseOf(db, b.warehouseId, b.companyId);
   const m = await minorUnits(db, b.companyId);
-  const r = (await db.query("INSERT INTO purchase_receipts (tenant_id, company_id, supplier_id, warehouse_id, receipt_date, supplier_ref, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id",
-    [u.tenantId, b.companyId, b.supplierId, b.warehouseId, b.receiptDate, b.supplierRef ?? null, u.userId])).rows[0];
+  const r = (await db.query("INSERT INTO purchase_receipts (tenant_id, company_id, supplier_id, warehouse_id, receipt_date, supplier_ref, created_by, purchase_order_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id",
+    [u.tenantId, b.companyId, b.supplierId, b.warehouseId, b.receiptDate, b.supplierRef ?? null, u.userId, b.purchaseOrderId ?? null])).rows[0];
   let i = 0;
   for (const l of b.lines) {
     const { item, uomId, factor } = await itemUom(db, l.itemId, l.uomId);
@@ -30,9 +30,9 @@ export async function createReceipt(db: Db, u: UserCtx, b: { companyId: string; 
     if (item.track_lots && !l.lotNo) throw E.rule("LOT_REQUIRED", `رقم التشغيلة إلزامي للصنف ${item.code}`, `Lot number is required for ${item.code}`);
     const expiry = await lotDates(db, item, l.productionDate, l.expiryDate);
     await db.query(
-      `INSERT INTO purchase_receipt_lines (tenant_id, doc_id, line_no, item_id, uom_id, factor, qty, base_qty, unit_cost, line_total, lot_no, production_date, expiry_date)
-       VALUES ($1,$2,$3,$4,$5,$6::numeric,$7::numeric, round($7::numeric * $6::numeric, 4), $8::numeric, round($7::numeric * $8::numeric, $12), $9, $10, $11)`,
-      [u.tenantId, r.id, ++i, l.itemId, uomId, factor, l.qty, l.unitCost, l.lotNo ?? null, l.productionDate ?? null, expiry, m]);
+      `INSERT INTO purchase_receipt_lines (tenant_id, doc_id, line_no, item_id, uom_id, factor, qty, base_qty, unit_cost, line_total, lot_no, production_date, expiry_date, order_line_id)
+       VALUES ($1,$2,$3,$4,$5,$6::numeric,$7::numeric, round($7::numeric * $6::numeric, 4), $8::numeric, round($7::numeric * $8::numeric, $12), $9, $10, $11, $13)`,
+      [u.tenantId, r.id, ++i, l.itemId, uomId, factor, l.qty, l.unitCost, l.lotNo ?? null, l.productionDate ?? null, expiry, m, l.orderLineId ?? null]);
   }
   await db.query("UPDATE purchase_receipts SET total = (SELECT sum(line_total) FROM purchase_receipt_lines WHERE doc_id = $1) WHERE id = $1", [r.id]);
   await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "purchase_receipt.draft_created", entityType: "purchase_receipt", entityId: r.id, after: b });
@@ -55,6 +55,13 @@ export async function postReceipt(db: Db, u: UserCtx, id: string) {
   const number = await docNumber(db, u, d.company_id, "GR", d.receipt_date);
   const je = await postJournal(db, u, { companyId: d.company_id, date: d.receipt_date, memo: `إذن استلام ${number}`, sourceType: "purchase_receipt", sourceId: id, parts });
   await markPosted(db, u, "purchase_receipts", id, number, je);
+  if (d.purchase_order_id) {
+    // goods received against a purchase order: counters move (over-receipt is refused by the database), the order status follows
+    await db.query(`UPDATE purchase_order_lines ol SET received_base_qty = ol.received_base_qty + x.q
+        FROM (SELECT order_line_id, sum(base_qty) AS q FROM purchase_receipt_lines WHERE doc_id = $1 AND order_line_id IS NOT NULL GROUP BY 1) x WHERE ol.id = x.order_line_id`, [id]);
+    await db.query(`UPDATE purchase_orders o SET status = CASE WHEN x.done THEN 'received'::purchase_order_status ELSE 'partially_received'::purchase_order_status END
+        FROM (SELECT bool_and(received_base_qty >= base_qty) AS done FROM purchase_order_lines WHERE doc_id = $1) x WHERE o.id = $1`, [d.purchase_order_id]);
+  }
   await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "purchase_receipt.posted", entityType: "purchase_receipt", entityId: id, after: { number, total: d.total } });
   return getReceipt(db, id);
 }

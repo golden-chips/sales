@@ -29,6 +29,7 @@ import { crmRoutes } from "./modules/crm/crm.routes.js";
 import { docsRoutes } from "./modules/docs/docs.routes.js";
 import { projectRoutes } from "./modules/projects/projects.routes.js";
 import { goLiveRoutes } from "./modules/golive/golive.routes.js";
+import { orderRoutes } from "./modules/orders/orders.routes.js";
 import { pool } from "./db/pool.js";
 
 const PG_MAP: Record<string, [number, string, string, string]> = {
@@ -123,6 +124,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     await v1.register(docsRoutes);
     await v1.register(projectRoutes);
     await v1.register(goLiveRoutes);
+    await v1.register(orderRoutes);
   }, { prefix: "/api/v1" });
   // fingerprint devices (ZKTeco iclock/ADMS) post to a fixed path at the server root
   await app.register(iclockRoutes);

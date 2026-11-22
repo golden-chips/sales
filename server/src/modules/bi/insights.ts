@@ -70,15 +70,17 @@ export async function purchaseSuggestions(db: Db, companyId: string, asOf: strin
   const items = await rows(db,
     `WITH use AS (SELECT item_id, -sum(qty) AS q FROM stock_moves WHERE company_id = $1 AND qty < 0 AND source_type = ANY($3) AND move_date BETWEEN $2::date - 89 AND $2 GROUP BY item_id),
           bal AS (SELECT sb.item_id, sum(sb.qty) AS q FROM stock_balances sb JOIN warehouses w ON w.id = sb.warehouse_id WHERE ${companyWh} GROUP BY sb.item_id),
-          incoming AS (SELECT 0 AS q)   -- purchase orders are not implemented yet (K13): nothing is "on order"
+          incoming AS (SELECT l.item_id, sum(l.base_qty - l.received_base_qty) AS q FROM purchase_order_lines l JOIN purchase_orders o ON o.id = l.doc_id
+                        WHERE o.company_id = $1 AND o.status IN ('pending_approval', 'approved', 'partially_received') GROUP BY l.item_id)
      SELECT i.code, i.name_ar, i.kind, u.code AS uom, round(use.q / 90, 4)::text AS daily_use, coalesce(bal.q, 0)::numeric(20,4)::text AS on_hand,
+            coalesce(inc.q, 0)::numeric(20,4)::text AS on_order,
             CASE WHEN use.q > 0 THEN floor(coalesce(bal.q, 0) / (use.q / 90)) END AS days_of_cover,
-            ceil(greatest(0, use.q / 90 * ($4::int + $5::int) - coalesce(bal.q, 0)))::text AS suggested_qty, i.reorder_level::text AS reorder_level
-       FROM use JOIN items i ON i.id = use.item_id JOIN uoms u ON u.id = i.base_uom_id LEFT JOIN bal ON bal.item_id = use.item_id
-      WHERE i.company_id = $1 AND i.kind IN ('raw', 'packaging') AND use.q > 0 AND use.q / 90 * ($4::int + $5::int) > coalesce(bal.q, 0)
+            ceil(greatest(0, use.q / 90 * ($4::int + $5::int) - coalesce(bal.q, 0) - coalesce(inc.q, 0)))::text AS suggested_qty, i.reorder_level::text AS reorder_level
+       FROM use JOIN items i ON i.id = use.item_id JOIN uoms u ON u.id = i.base_uom_id LEFT JOIN bal ON bal.item_id = use.item_id LEFT JOIN incoming inc ON inc.item_id = use.item_id
+      WHERE i.company_id = $1 AND i.kind IN ('raw', 'packaging') AND use.q > 0 AND use.q / 90 * ($4::int + $5::int) > coalesce(bal.q, 0) + coalesce(inc.q, 0)
       ORDER BY CASE WHEN use.q > 0 THEN coalesce(bal.q, 0) / (use.q / 90) END NULLS FIRST LIMIT 100`, [companyId, asOf, CONSUMPTION, leadDays, safetyDays]);
-  return { method: { ar: `متوسط الاستهلاك اليومي لآخر 90 يومًا × (مدة التوريد ${leadDays} + أيام أمان ${safetyDays}) − الرصيد الحالي. لا تُحتسب أوامر الشراء المفتوحة لأنها غير منفذة بعد.`,
-    en: `Average daily use over 90 days × (lead time ${leadDays} + safety ${safetyDays} days) − stock on hand. Open purchase orders are not counted (not implemented yet).` }, items };
+  return { method: { ar: `متوسط الاستهلاك اليومي لآخر 90 يومًا × (مدة التوريد ${leadDays} + أيام أمان ${safetyDays}) − الرصيد الحالي − الكميات المتبقية في أوامر الشراء المفتوحة.`,
+    en: `Average daily use over 90 days × (lead time ${leadDays} + safety ${safetyDays} days) − stock on hand − quantities still open on purchase orders.` }, items };
 }
 
 /** customers who bought regularly before but stopped recently */

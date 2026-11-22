@@ -12,8 +12,8 @@ const METHOD_ROLE = { cash: "cash_main", bank: "bank_main", rep_custody: "rep_ca
 
 export interface InvoiceInput {
   companyId: string; branchId?: string | null; warehouseId: string; customerId: string; invoiceDate: string; paymentType: "cash" | "credit"; notes?: string;
-  posShiftId?: string | null; posClientId?: string | null;
-  lines: { itemId: string; uomId?: string | null; qty: string; unitPrice?: string; discountPct?: string; taxPct?: string; lotId?: string | null }[];
+  posShiftId?: string | null; posClientId?: string | null; salesOrderId?: string | null;
+  lines: { itemId: string; uomId?: string | null; qty: string; unitPrice?: string; discountPct?: string; taxPct?: string; lotId?: string | null; orderLineId?: string | null }[];
 }
 
 async function customerOf(db: Db, id: string, companyId: string) {
@@ -30,9 +30,9 @@ export async function createInvoice(db: Db, u: UserCtx, b: InvoiceInput) {
   const m = await minorUnits(db, b.companyId);
   const cur = (await db.query("SELECT base_currency FROM companies WHERE id = $1", [b.companyId])).rows[0].base_currency;
   const inv = (await db.query(
-    `INSERT INTO sales_invoices (tenant_id, company_id, branch_id, warehouse_id, customer_id, invoice_date, payment_type, currency, notes, created_by, pos_shift_id, pos_client_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
-    [u.tenantId, b.companyId, b.branchId ?? null, b.warehouseId, b.customerId, b.invoiceDate, b.paymentType, cur, b.notes ?? null, u.userId, b.posShiftId ?? null, b.posClientId ?? null])).rows[0];
+    `INSERT INTO sales_invoices (tenant_id, company_id, branch_id, warehouse_id, customer_id, invoice_date, payment_type, currency, notes, created_by, pos_shift_id, pos_client_id, sales_order_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
+    [u.tenantId, b.companyId, b.branchId ?? null, b.warehouseId, b.customerId, b.invoiceDate, b.paymentType, cur, b.notes ?? null, u.userId, b.posShiftId ?? null, b.posClientId ?? null, b.salesOrderId ?? null])).rows[0];
   let i = 0;
   for (const l of b.lines) {
     const { item, uomId, factor } = await itemUom(db, l.itemId, l.uomId);
@@ -48,9 +48,9 @@ export async function createInvoice(db: Db, u: UserCtx, b: InvoiceInput) {
       `WITH c AS (SELECT round($6::numeric * $8::numeric, $12) AS gross),
             d AS (SELECT gross, round(gross * $9::numeric / 100, $12) AS disc FROM c),
             t AS (SELECT gross, disc, gross - disc AS net, round((gross - disc) * $10::numeric / 100, $12) AS tax FROM d)
-       INSERT INTO sales_invoice_lines (tenant_id, doc_id, line_no, item_id, uom_id, factor, qty, base_qty, unit_price, discount_pct, tax_pct, net_amount, tax_amount, line_total, lot_id)
-       SELECT $1,$2,$3,$4,$5,$7::numeric,$6::numeric, round($6::numeric * $7::numeric, 4), $8::numeric, $9::numeric, $10::numeric, t.net, t.tax, t.net + t.tax, $11 FROM t`,
-      [u.tenantId, inv.id, ++i, l.itemId, uomId, l.qty, factor, price, l.discountPct ?? "0", l.taxPct ?? "0", l.lotId ?? null, m]);
+       INSERT INTO sales_invoice_lines (tenant_id, doc_id, line_no, item_id, uom_id, factor, qty, base_qty, unit_price, discount_pct, tax_pct, net_amount, tax_amount, line_total, lot_id, order_line_id)
+       SELECT $1,$2,$3,$4,$5,$7::numeric,$6::numeric, round($6::numeric * $7::numeric, 4), $8::numeric, $9::numeric, $10::numeric, t.net, t.tax, t.net + t.tax, $11, $13 FROM t`,
+      [u.tenantId, inv.id, ++i, l.itemId, uomId, l.qty, factor, price, l.discountPct ?? "0", l.taxPct ?? "0", l.lotId ?? null, m, l.orderLineId ?? null]);
   }
   // header totals: gross (subtotal) − discount + tax = total, all from the rounded line amounts
   await db.query(
@@ -111,8 +111,17 @@ export async function postInvoice(db: Db, u: UserCtx, id: string, opts: { settle
   const je = await postAccounts(db, u, { companyId: d.company_id, date: d.invoice_date, memo: `فاتورة مبيعات ${number} — ${c.name_ar}`, sourceType: "sales_invoice", sourceId: id, parts: accParts });
   const due = (await n(db, "SELECT ($1::date + $2::int)::text AS d", [d.invoice_date, d.payment_type === "credit" ? c.payment_terms_days : 0])).d;
   await markPosted(db, u, "sales_invoices", id, number, je, { cogs_total: cogs, due_date: due, amount_paid: settled ?? (d.payment_type === "cash" ? d.total : 0) });
+  if (d.sales_order_id) await fulfilSalesOrder(db, id, d.sales_order_id);
   await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "sales_invoice.posted", entityType: "sales_invoice", entityId: id, after: { number, total: d.total, cogs, journal: je } });
   return getInvoice(db, id);
+}
+
+/** an invoice made from a sales order delivers its lines: counters move, the order status follows (over-delivery is refused by the database) */
+async function fulfilSalesOrder(db: Db, invoiceId: string, orderId: string) {
+  await db.query(`UPDATE sales_order_lines ol SET delivered_base_qty = ol.delivered_base_qty + x.q
+      FROM (SELECT order_line_id, sum(base_qty) AS q FROM sales_invoice_lines WHERE doc_id = $1 AND order_line_id IS NOT NULL GROUP BY 1) x WHERE ol.id = x.order_line_id`, [invoiceId]);
+  await db.query(`UPDATE sales_orders o SET status = CASE WHEN x.done THEN 'delivered'::sales_order_status ELSE 'partially_delivered'::sales_order_status END
+      FROM (SELECT bool_and(delivered_base_qty >= base_qty) AS done FROM sales_order_lines WHERE doc_id = $1) x WHERE o.id = $1`, [orderId]);
 }
 
 export async function getInvoice(db: Db, id: string) {

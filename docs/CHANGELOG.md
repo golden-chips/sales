@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0 — unreleased — first full trial version
+### Added
+- **Quotations → sales orders → invoices** (migration 016): credit-limit check on confirmation (open receivables + open credit orders), stock reservation by available-to-promise (sellable, not expired, not on QC hold, minus other confirmed orders; serialized per warehouse), explicit backorders, partial invoicing linked to order lines, no over-delivery (DB constraint), close/cancel releases the reservation.
+- **Purchase orders**: approval threshold per company (auto-approve at or below it; above it an approver other than the creator), goods receipts created from the order at the ordered cost, no over-receipt, close the remainder.
+- Smart insights: purchase suggestions subtract quantities still open on purchase orders.
+- Screens: Quotations, Sales orders, Purchase orders.
+
 ## 0.7.0 — 2026-11-13 — Phase 7 (go-live tooling)
 ### Added
 - **Go-live readiness** computed from the company's data, with links; **sign-offs** (chart of accounts, opening balances — refused unless reconciled, UAT, go-live — refused while items block).

@@ -22,6 +22,7 @@ import Items from "./pages/erp/Items";
 import Stock from "./pages/erp/Stock";
 import SalesInvoices, { ArAging, Receipts, SalesReturns } from "./pages/erp/Sales";
 import PurchaseReceipts, { StockDocuments, SupplierInvoices } from "./pages/erp/Purchasing";
+import { PurchaseOrders, Quotations, SalesOrders } from "./pages/erp/Orders";
 import { Formulas, Mrp, ProductionOrders } from "./pages/mfg/Manufacturing";
 import { NonConformances, QualityChecks, QualitySpecs, TraceRecall } from "./pages/mfg/Quality";
 import RepApp from "./pages/field/RepApp";
@@ -62,6 +63,9 @@ export default function App() {
       <Route path="/inventory/items" element={<Items />} />
       <Route path="/inventory/stock" element={<Stock />} />
       <Route path="/inventory/documents" element={<StockDocuments />} />
+      <Route path="/sales/quotations" element={<Quotations />} />
+      <Route path="/sales/orders" element={<SalesOrders />} />
+      <Route path="/purchasing/orders" element={<PurchaseOrders />} />
       <Route path="/sales/invoices" element={<SalesInvoices />} />
       <Route path="/sales/returns" element={<SalesReturns />} />
       <Route path="/sales/receipts" element={<Receipts />} />
