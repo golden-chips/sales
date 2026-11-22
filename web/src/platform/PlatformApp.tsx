@@ -3,6 +3,7 @@ import { api, fmt, fmtDate, getSession, setSession } from "../api";
 import { useI18n } from "../i18n";
 import { Empty, ErrorBox, Field, Loading, Modal, StatusBadge, errMsg, useAsync, useToast } from "../ui";
 import { TopControls } from "../App";
+import { PlanDesigner } from "./PlanDesigner";
 
 const P = "platform" as const;
 
@@ -37,6 +38,7 @@ function Console({ onOut }: { onOut: () => void }) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<string | null>(null);
   const [prov, setProv] = useState(false);
+  const [design, setDesign] = useState<any | "new" | null>(null);
   const tenants = useAsync(() => api.get(`/platform/tenants?pageSize=200${q ? `&q=${encodeURIComponent(q)}` : ""}`, P), [q]);
   const plans = useAsync(() => api.get("/platform/plans", P), []);
   const detail = useAsync(() => (sel ? api.get(`/platform/tenants/${sel}`, P) : Promise.resolve(null)), [sel]);
@@ -56,10 +58,17 @@ function Console({ onOut }: { onOut: () => void }) {
             <td className="row"><button className="btn sm primary" onClick={() => handle(r.id, "complete")}>{lang === "ar" ? "تفعيل" : "Activate"}</button><button className="btn sm" onClick={() => handle(r.id, "reject")}>{lang === "ar" ? "رفض" : "Reject"}</button></td></tr>)}</tbody>
         </table></div></div>}
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2>{t.plans}</h2>
+        <div className="row"><h2 style={{ margin: 0 }}>{t.plans}</h2><span className="spacer" />
+          <button className="btn primary" onClick={() => setDesign("new")}>{lang === "ar" ? "+ تصميم باقة جديدة" : "+ Design a plan"}</button></div>
+        <p style={{ color: "var(--muted)", marginTop: 6 }}>{lang === "ar" ? "اضغط على أي باقة لتعديل سعرها وحدودها وأقسامها." : "Click a plan to edit its price, limits and modules."}</p>
         {plans.loading ? <Loading rows={2} /> : <div className="table-wrap"><table>
-          <thead><tr><th>{t.code}</th><th>{t.name}</th><th className="end">/month</th><th className="end">/year</th><th>users</th><th>{t.branches}</th><th>{t.warehouses}</th><th>modules</th></tr></thead>
-          <tbody>{plans.data?.map((p: any) => <tr key={p.id}><td className="num">{p.code}</td><td>{pick(p.name_ar, p.name_en)}</td><td className="end num">{fmt(p.price_monthly)} {p.currency}</td><td className="end num">{fmt(p.price_yearly)}</td><td className="num">{p.max_users}</td><td className="num">{p.max_branches}</td><td className="num">{p.max_warehouses}</td><td style={{ whiteSpace: "normal", maxWidth: 360 }}>{p.modules.join(", ")}</td></tr>)}</tbody>
+          <thead><tr><th>{t.code}</th><th>{t.name}</th><th className="end">{lang === "ar" ? "شهريًا" : "Monthly"}</th><th className="end">{lang === "ar" ? "سنويًا" : "Yearly"}</th>
+            <th>{lang === "ar" ? "مستخدمون" : "Users"}</th><th>{t.branches}</th><th>{t.warehouses}</th><th>{lang === "ar" ? "الأقسام" : "Modules"}</th><th>{lang === "ar" ? "العملاء عليها" : "Customers"}</th><th>{t.status}</th></tr></thead>
+          <tbody>{plans.data?.map((p: any) => <tr key={p.id} style={{ cursor: "pointer", opacity: p.is_active ? 1 : 0.55 }} onClick={() => setDesign(p)}>
+            <td className="num">{p.code}</td><td>{pick(p.name_ar, p.name_en)} {p.is_trial_default && <span className="badge ok">{lang === "ar" ? "باقة التجربة" : "trial"}</span>}</td>
+            <td className="end num">{fmt(p.price_monthly)} {p.currency}</td><td className="end num">{fmt(p.price_yearly)}</td><td className="num">{p.max_users}</td><td className="num">{p.max_branches}</td><td className="num">{p.max_warehouses}</td>
+            <td className="num">{p.modules.length}</td><td className="num">{p.tenants}</td>
+            <td>{!p.is_active ? <span className="badge">{lang === "ar" ? "موقوفة" : "inactive"}</span> : p.is_public ? <span className="badge ok">{lang === "ar" ? "ظاهرة" : "public"}</span> : <span className="badge">{lang === "ar" ? "مخفية" : "hidden"}</span>}</td></tr>)}</tbody>
         </table></div>}
       </div>
       <div className="card">
@@ -91,6 +100,7 @@ function Console({ onOut }: { onOut: () => void }) {
           <p style={{ color: "var(--muted)", fontSize: 12 }}>Platform staff see metadata and usage counts only — tenant business data is isolated by the database.</p>
         </div>}
       </Modal>}
+      {design && <PlanDesigner plan={design === "new" ? null : design} onClose={() => setDesign(null)} onSaved={() => { setDesign(null); plans.reload(); }} />}
       {prov && plans.data && <Provision plans={plans.data} onClose={() => setProv(false)} onDone={() => { setProv(false); tenants.reload(); toast(t.savedOk); }} />}
     </div>
   );

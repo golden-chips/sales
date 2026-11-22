@@ -64,7 +64,7 @@ export async function request<T = any>(method: string, path: string, body?: unkn
 export const api = {
   get: <T = any>(p: string, scope?: Scope) => request<T>("GET", p, undefined, { scope }),
   post: <T = any>(p: string, b?: unknown, o?: { scope?: Scope; idempotencyKey?: string }) => request<T>("POST", p, b ?? {}, o),
-  put: <T = any>(p: string, b: unknown) => request<T>("PUT", p, b),
+  put: <T = any>(p: string, b: unknown, o?: { scope?: Scope }) => request<T>("PUT", p, b, o),
   patch: <T = any>(p: string, b: unknown) => request<T>("PATCH", p, b),
   del: <T = any>(p: string) => request<T>("DELETE", p),
 };

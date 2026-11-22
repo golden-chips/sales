@@ -50,9 +50,10 @@ describe("RBAC", () => {
   });
 
   it("module not in plan returns 402", async () => {
-    const plan = await createPlan(p, { modules: ["core"] });
+    // accounting is part of every plan (plan designer rule), so gating is checked on sales
+    const plan = await createPlan(p, { modules: ["accounting"] });
     const X = await provision(p, plan.code);
-    const r = await api("GET", `/api/v1/accounting/accounts?companyId=${X.companyId}`, undefined, { token: X.token });
+    const r = await api("GET", `/api/v1/sales/invoices?companyId=${X.companyId}`, undefined, { token: X.token });
     expect(r.status).toBe(402);
     expect(r.body.error.code).toBe("MODULE_NOT_IN_PLAN");
   });

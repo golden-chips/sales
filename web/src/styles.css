@@ -306,3 +306,14 @@ a.attention-row:hover { background: var(--surface-2); text-decoration: none; }
 .plan-mods li.off { color: var(--muted); opacity: .55; } .plan-mods li.off svg { color: var(--muted); }
 .plan-pick { margin-top: auto; justify-content: center; }
 .modal.wide { width: min(1180px, 100%); }
+
+/* ---- plan designer (platform) */
+.designer { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); gap: 22px; }
+@media (max-width: 900px) { .designer { grid-template-columns: 1fr; } }
+.mod-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.mod-group { display: grid; gap: 6px; align-content: start; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+.mod-group > b { font-size: 13px; color: var(--muted); }
+.mod-item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 4px 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.mod-item.on { background: var(--brand-soft); }
+.mod-item small { grid-column: 2 / -1; color: var(--muted); font-size: 11.5px; }
+.alert.ok { background: var(--ok-soft); color: var(--ok); border-color: transparent; }

@@ -7,6 +7,7 @@ import { E } from "../../core/errors.js";
 import { audit } from "../../core/audit.js";
 import { DUMMY_HASH, signPlatform, verifyPassword, verifyTotp } from "../../core/security.js";
 import { config } from "../../config.js";
+import { MODULE_RULES, checkPlanModules } from "../../core/moduleRules.js";
 import { changePlan, newTenantId, provisionTenant, setTenantStatus, sweepSubscriptions } from "./platform.service.js";
 
 const T = { tags: ["Platform"] };
@@ -18,8 +19,19 @@ const zPlan = z.object({
   maxUsers: z.number().int().positive(), maxCompanies: z.number().int().positive().default(1),
   maxBranches: z.number().int().positive(), maxWarehouses: z.number().int().positive(),
   storageMb: z.number().int().positive(), apiRpm: z.number().int().positive(),
-  modules: z.array(z.string()).min(1), isPublic: z.boolean().default(true),
+  modules: z.array(z.string()).min(1), isPublic: z.boolean().default(true), isActive: z.boolean().default(true),
 });
+
+/** module names from the catalogue + the dependency check; impossible combinations are refused */
+async function validatePlan(db: any, modules: string[]) {
+  const names: Record<string, [string, string]> = Object.fromEntries((await db.query("SELECT code, name_ar, name_en FROM modules")).rows.map((m: any) => [m.code, [m.name_ar, m.name_en]]));
+  const unknown = modules.filter((m) => !names[m]);
+  if (unknown.length) throw E.validation([{ path: "modules", message: `unknown modules: ${unknown.join(", ")}` }]);
+  const all = [...new Set(["core", ...modules])];
+  const check = checkPlanModules(all, names);
+  if (check.errors.length) throw E.rule("PLAN_MODULES_INCOMPLETE", check.errors.map((e) => e.ar).join("؛ "), check.errors.map((e) => e.en).join("; "), check.errors);
+  return { all, warnings: check.warnings };
+}
 
 const zProvision = z.object({
   code: z.string().regex(/^[a-z0-9][a-z0-9-]{2,39}$/), legalName: z.string().min(2), nameEn: z.string().optional(), industry: z.string().optional(),
@@ -59,21 +71,48 @@ export async function platformRoutes(app: FastifyInstance) {
   await app.register(async (p) => {
     p.addHook("preHandler", authenticatePlatform);
 
-    p.get("/plans", { schema: { ...T, summary: "List plans" } }, async () => withPlatform(async (db) =>
-      (await db.query(`SELECT p.*, ARRAY(SELECT module_code FROM plan_modules m WHERE m.plan_id = p.id ORDER BY module_code) AS modules FROM plans p ORDER BY price_monthly`)).rows));
+    p.get("/plans", { schema: { ...T, summary: "List plans (with how many tenants are on each)" } }, async () => withPlatform(async (db) =>
+      (await db.query(`SELECT p.*, ARRAY(SELECT module_code FROM plan_modules m WHERE m.plan_id = p.id ORDER BY module_code) AS modules,
+          (SELECT count(*)::int FROM subscriptions s WHERE s.plan_id = p.id AND s.status IN ('trialing','active','past_due')) AS tenants
+         FROM plans p ORDER BY p.is_active DESC, price_monthly, max_users`)).rows));
+
+    p.get("/modules", { schema: { ...T, summary: "Module catalogue with dependency rules (for the plan designer)" } }, async () => withPlatform(async (db) =>
+      (await db.query("SELECT code, name_ar, name_en, sort_order FROM modules ORDER BY sort_order")).rows.map((m: any) => ({ ...m, rule: MODULE_RULES[m.code] ?? {} }))));
 
     p.post("/plans", { schema: { ...T, summary: "Create plan" } }, async (req, reply) => {
       const b = parse(zPlan, req.body);
       const plan = await withPlatform(async (db) => {
+        const { all, warnings } = await validatePlan(db, b.modules);
         const r = (await db.query(
           `INSERT INTO plans (code,name_ar,name_en,currency,price_monthly,price_yearly,trial_days,grace_days,max_users,max_companies,max_branches,max_warehouses,storage_mb,api_rpm,is_public)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
           [b.code, b.nameAr, b.nameEn, b.currency, b.priceMonthly, b.priceYearly, b.trialDays, b.graceDays, b.maxUsers, b.maxCompanies, b.maxBranches, b.maxWarehouses, b.storageMb, b.apiRpm, b.isPublic])).rows[0];
-        await db.query("INSERT INTO plan_modules (plan_id, module_code) SELECT $1, unnest($2::text[])", [r.id, [...new Set(["core", ...b.modules])]]);
+        await db.query("INSERT INTO plan_modules (plan_id, module_code) SELECT $1, unnest($2::text[])", [r.id, all]);
         await audit(db, { tenantId: null, actorType: "platform", actorId: req.platformUserId!, action: "plan.created", entityType: "plan", entityId: r.id, after: b });
-        return r;
+        return { ...r, modules: all, warnings };
       });
       return reply.code(201).send(plan);
+    });
+
+    p.put("/plans/:code", { schema: { ...T, summary: "Edit a plan (prices, limits, modules, visibility). Applies to every tenant on it." } }, async (req) => {
+      const { code } = parse(z.object({ code: z.string() }), req.params);
+      const b = parse(zPlan.omit({ code: true }), req.body);
+      return withPlatform(async (db) => {
+        const before = (await db.query("SELECT p.*, ARRAY(SELECT module_code FROM plan_modules m WHERE m.plan_id = p.id) AS modules FROM plans p WHERE code = $1 FOR UPDATE", [code])).rows[0];
+        if (!before) throw E.notFound("plan");
+        const { all, warnings } = await validatePlan(db, b.modules);
+        if (!b.isActive && before.is_trial_default) throw E.rule("PLAN_IS_TRIAL_DEFAULT", "هذه باقة التجربة المجانية — اختر باقة تجربة أخرى قبل إيقافها", "This is the trial plan — pick another trial plan first");
+        const r = (await db.query(
+          `UPDATE plans SET name_ar=$2, name_en=$3, currency=$4, price_monthly=$5, price_yearly=$6, trial_days=$7, grace_days=$8, max_users=$9, max_companies=$10,
+             max_branches=$11, max_warehouses=$12, storage_mb=$13, api_rpm=$14, is_public=$15, is_active=$16 WHERE id = $1 RETURNING *`,
+          [before.id, b.nameAr, b.nameEn, b.currency, b.priceMonthly, b.priceYearly, b.trialDays, b.graceDays, b.maxUsers, b.maxCompanies, b.maxBranches, b.maxWarehouses,
+           b.storageMb, b.apiRpm, b.isPublic, b.isActive])).rows[0];
+        await db.query("DELETE FROM plan_modules WHERE plan_id = $1 AND NOT (module_code = ANY($2::text[]))", [before.id, all]);
+        await db.query("INSERT INTO plan_modules (plan_id, module_code) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING", [before.id, all]);
+        await audit(db, { tenantId: null, actorType: "platform", actorId: req.platformUserId!, action: "plan.updated", entityType: "plan", entityId: before.id,
+          before: { ...before, modules: before.modules }, after: b });
+        return { ...r, modules: all, warnings, removedModules: before.modules.filter((m: string) => !all.includes(m)) };
+      });
     });
 
     p.get("/tenants", { schema: { ...T, summary: "List tenants (metadata only)" } }, async (req) => {
