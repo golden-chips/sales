@@ -17,7 +17,9 @@ export function PosCounter() {
   const registers = useAsync(() => api.get(`/pos/registers?companyId=${companyId}`), [companyId]);
   const [reg, setReg] = useState("");
   const [float, setFloat] = useState("0");
-  if (current.loading) return <Loading />;
+  // only the first load shows the spinner: refreshing the shift after a sale must not unmount the
+  // counter (that would drop the receipt the cashier is about to print)
+  if (current.loading && current.data === undefined) return <Loading />;
   if (!current.data) {
     const free = (registers.data ?? []).filter((r: any) => r.is_active && !r.open_shift_id);
     const open = async () => {

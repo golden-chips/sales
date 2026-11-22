@@ -51,7 +51,7 @@ export default function RepApp() {
   };
   useEffect(() => { if (online && queue.length) sync(); /* eslint-disable-next-line */ }, [online]);
 
-  if (day.loading) return <Loading />;
+  if (day.loading && day.data === undefined) return <Loading />;   // refreshes keep the open visit on screen
   if ((day.error as any)?.code === "NOT_A_REP") return <div className="card"><Empty text={tt("هذه الشاشة للمندوبين. حسابك غير مسجل كمندوب — يسجّله مدير المبيعات من «المناديب والمسارات».",
     "This screen is for field reps. Your account is not registered as a rep — the sales manager can add it under Reps & routes.")} /></div>;
   if (day.error) return <ErrorBox error={day.error} />;

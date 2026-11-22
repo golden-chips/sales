@@ -6,6 +6,11 @@
 - **Purchase orders**: approval threshold per company (auto-approve at or below it; above it an approver other than the creator), goods receipts created from the order at the ordered cost, no over-receipt, close the remainder.
 - Smart insights: purchase suggestions subtract quantities still open on purchase orders.
 - Screens: Quotations, Sales orders, Purchase orders.
+- **DEMO data for every module** (`scripts/seed-demo-extras.ts`) and one DEMO user per role (13 roles), wired into `deploy/setup.sh`.
+- **Browser end-to-end tests** (`e2e/`, Playwright) in CI on a freshly seeded database: every screen for the GM, every role's own menu, and the key flows.
+### Fixed (found by the new browser tests)
+- POS: the receipt did not appear after a sale (the shift refresh unmounted the counter); the sale itself was always recorded correctly. Same guard added to the rep app so a refresh cannot close an open visit.
+- "My attendance" / "My day" showed a red error to users not linked to an employee or not registered as a rep; they now explain what to ask for.
 
 ## 0.7.0 — 2026-11-13 — Phase 7 (go-live tooling)
 ### Added
