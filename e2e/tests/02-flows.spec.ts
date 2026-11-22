@@ -112,13 +112,18 @@ test("field rep: today's route with customers", async ({ page }) => {
   expect(errs).toEqual([]);
 });
 
-test("reports: trial balance balances and insights open", async ({ page }) => {
+test("reports: trial balance balances (accountant) and BI opens (finance manager)", async ({ page, browser }) => {
   const errs = watchErrors(page);
   await login(page, "accountant");
   await page.goto("/trial-balance");
   await expect(page.locator("main.content")).toContainText(/متوازن|Balanced/);
   await expect(page.locator("main.content")).not.toContainText("غير متوازن");
-  await page.goto("/bi");
-  await expect(page.locator("main.content .kpi").first()).toBeVisible();
+  const fin = await browser.newPage();   // separate session; BI is a finance/management permission, not the accountant's
+  const finErrs = watchErrors(fin);
+  await login(fin, "finance");
+  await fin.goto("/bi");
+  await expect(fin.locator("main.content .kpi").first()).toBeVisible();
+  expect(finErrs).toEqual([]);
+  await fin.close();
   expect(errs).toEqual([]);
 });
