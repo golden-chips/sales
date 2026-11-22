@@ -68,3 +68,10 @@ MSG
 else
   echo "GOLDEN ERP updated and running at: $PUBLIC_URL"
 fi
+
+# DEMO data for every module + one DEMO user per role (idempotent; demo tenant only)
+if [ "${SEED_DEMO:-true}" != "false" ]; then
+  docker compose exec -T -e DEMO_USERS_PASSWORD="${DEMO_PW:-}" api ./node_modules/.bin/tsx scripts/seed-demo-extras.ts \
+    || echo "warning: some DEMO data sections failed (see above) — the system itself is fine"
+  echo "DEMO role users (company code demo-foods, same password as the DEMO owner): gm@ accountant@ finance@ sales@ warehouse@ production@ quality@ hr@ cashier@ possup@ maintenance@ service@ projects@ — all @demo-foods.example"
+fi

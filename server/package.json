@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
+    "db:seed-demo": "tsx scripts/seed-demo-extras.ts",
     "db:reset-test": "tsx scripts/reset-test-db.ts",
     "test": "vitest run",
     "openapi:export": "tsx scripts/export-openapi.ts",
