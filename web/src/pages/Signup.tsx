@@ -1,12 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, fmt } from "../api";
+import { MODULE_NAMES } from "../PlanCards";
 import { useI18n } from "../i18n";
 import { useSession } from "../session";
 import { ErrorBox, Field } from "../ui";
 import { TopControls } from "../App";
 
-const MOD_AR: Record<string, string> = { accounting: "المحاسبة", sales: "المبيعات", purchasing: "المشتريات", inventory: "المخازن", manufacturing: "التصنيع", quality: "الجودة",
-  distribution: "المناديب", fleet: "الأسطول", hr: "الموارد البشرية", payroll: "الرواتب", crm: "العملاء", pos: "نقاط البيع", bi: "التقارير", core: "الأساسيات" };
 
 export default function Signup() {
   const { tt, lang } = useI18n();
@@ -40,7 +39,7 @@ export default function Signup() {
           <div className="row"><div className="brand" style={{ padding: 0 }}><div className="logo">GC</div><div><b>GOLDEN ERP</b><small>{tt("نظام متكامل للمصانع والتجارة والتوزيع", "ERP for manufacturing, trading & distribution")}</small></div></div><span className="spacer" /><TopControls /></div>
           <h1>{trial ? tt(`جرّب مجانًا ${trial.trial_days} يومًا`, `Try free for ${trial.trial_days} days`) : tt("التجربة المجانية", "Free trial")}</h1>
           <p style={{ color: "var(--muted)", margin: 0 }}>{tt("بدون بطاقة دفع. تبدأ فورًا بدليل حسابات وسنة مالية جاهزين، وبياناتك معزولة تمامًا عن الشركات الأخرى.", "No card needed. Start right away with a ready chart of accounts and fiscal year; your data is fully isolated.")}</p>
-          {trial && <div className="row">{trial.modules.filter((m: string) => m !== "core").map((m: string) => <span key={m} className="badge info">{lang === "ar" ? MOD_AR[m] ?? m : m}</span>)}</div>}
+          {trial && <div className="row">{trial.modules.filter((m: string) => m !== "core").map((m: string) => <span key={m} className="badge info">{MODULE_NAMES[m] ? (lang === "ar" ? MODULE_NAMES[m][0] : MODULE_NAMES[m][1]) : m}</span>)}</div>}
           <h3 style={{ marginTop: 8 }}>{tt("الباقات", "Plans")}</h3>
           <div className="table-wrap"><table><thead><tr><th>{tt("الباقة", "Plan")}</th><th className="end">{tt("شهريًا", "Monthly")}</th><th>{tt("مستخدمون", "Users")}</th><th>{tt("فروع", "Branches")}</th></tr></thead>
             <tbody>{plans.map((p) => <tr key={p.code}><td>{lang === "ar" ? p.name_ar : p.name_en} {p.is_trial_default && <span className="badge ok">{tt("التجربة", "trial")}</span>}</td>
