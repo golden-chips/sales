@@ -12,7 +12,7 @@ function exportCsv(name: string, header: string[], rows: (string | number)[][]) 
 }
 
 export default function TrialBalance() {
-  const { t, pick } = useI18n();
+  const { t, tt, pick } = useI18n();
   const { companyId } = useSession();
   const [sp, setSp] = useSearchParams();
   const y = new Date().getFullYear();
@@ -48,10 +48,10 @@ export default function TrialBalance() {
         <>
           <ErrorBox error={tb.error || fs.error} />
           {fs.data && <div className="grid kpis" style={{ marginBottom: 16 }}>
-            <div className="card kpi"><div className="label">Revenue</div><div className="value num">{fmt(fs.data.incomeStatement.revenue)}</div></div>
-            <div className="card kpi"><div className="label">Expenses</div><div className="value num">{fmt(fs.data.incomeStatement.expenses)}</div></div>
-            <div className="card kpi"><div className="label">Net income</div><div className="value num">{fmt(fs.data.incomeStatement.netIncome)}</div></div>
-            <div className="card kpi"><div className="label">Assets = L + E</div><div className="value num">{fmt(fs.data.balanceSheet.assets)}</div><span className={`badge ${fs.data.balanceSheet.balanced ? "ok" : "bad"}`}>{fs.data.balanceSheet.balanced ? t.balanced : t.unbalanced}</span></div>
+            <div className="card kpi"><div className="label">{tt("الإيرادات", "Revenue")}</div><div className="value num">{fmt(fs.data.incomeStatement.revenue)}</div></div>
+            <div className="card kpi"><div className="label">{tt("المصروفات", "Expenses")}</div><div className="value num">{fmt(fs.data.incomeStatement.expenses)}</div></div>
+            <div className="card kpi"><div className="label">{tt("صافي الربح / الخسارة", "Net income")}</div><div className="value num">{fmt(fs.data.incomeStatement.netIncome)}</div></div>
+            <div className="card kpi"><div className="label">{tt("الأصول = الخصوم + حقوق الملكية", "Assets = L + E")}</div><div className="value num">{fmt(fs.data.balanceSheet.assets)}</div><span className={`badge ${fs.data.balanceSheet.balanced ? "ok" : "bad"}`}>{fs.data.balanceSheet.balanced ? t.balanced : t.unbalanced}</span></div>
           </div>}
           {!tb.data?.rows.length ? <div className="card"><Empty /></div> : (
             <div className="table-wrap"><table>

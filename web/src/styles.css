@@ -1,7 +1,7 @@
 /* =====================================================================
    GOLDEN ERP — design system
    Golden Chips identity: espresso sidebar, gold accent, warm neutrals.
-   Font: IBM Plex Sans Arabic (bundled, works offline / in the APK).
+   Fonts: Cairo (Arabic) + Inter (numbers, Latin) — bundled, work offline / in the APK.
    Contrast checked: text ≥ 4.5:1 on its background in light and dark.
    ===================================================================== */
 :root {
@@ -13,7 +13,7 @@
   --shadow-sm: 0 1px 2px rgba(42,31,23,.05);
   --shadow: 0 1px 2px rgba(42,31,23,.04), 0 4px 14px rgba(42,31,23,.06);
   --shadow-lg: 0 12px 40px rgba(30,21,16,.18);
-  --font: "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+  --font: "Inter", "Cairo", system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
@@ -31,7 +31,7 @@
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
-body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--ink); font-size: 14.5px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--ink); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
 a { color: var(--brand); text-decoration: none; font-weight: 500; }
 a:hover { text-decoration: underline; text-underline-offset: 3px; }
 h1 { font-size: 23px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
@@ -146,10 +146,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--b
 .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
 table { width: 100%; border-collapse: separate; border-spacing: 0; }
 th, td { padding: 12px 16px; text-align: start; border-bottom: 1px solid var(--line); white-space: nowrap; }
-th { background: var(--surface-2); font-size: 12.5px; color: var(--muted); font-weight: 600; position: sticky; top: 0; z-index: 1; }
+th { background: var(--surface-2); font-size: 13px; color: var(--ink); font-weight: 600; position: sticky; top: 0; z-index: 1; }
 tbody tr { transition: background .12s; }
 tbody tr:hover { background: color-mix(in srgb, var(--brand-soft) 55%, transparent); }
 tbody tr:last-child td { border-bottom: 0; } td.end, th.end { text-align: end; }
+/* numbers are laid out left-to-right (so "-77" keeps its sign in front); keep them on the same edge as their header in Arabic */
+:root[dir="rtl"] td.end.num, :root[dir="rtl"] th.end.num { text-align: left; }
 tfoot td { font-weight: 700; background: var(--surface-2); border-top: 1px solid var(--line-2); }
 
 /* ---------------------------------------------------------------- feedback */

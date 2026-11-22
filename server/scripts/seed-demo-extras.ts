@@ -151,6 +151,10 @@ async function main() {
 
   await section("fixed assets & maintenance", async () => {
     const F = as("finance"), M = as("maintenance");
+    // the owner adds capital to the bank first, so buying the machines does not overdraw it
+    const je = await as("accountant").post("/accounting/journal-entries", { companyId: C, entryDate: day(301), memo: "DEMO — زيادة رأس المال لتمويل الآلات",
+      lines: [{ accountId: acc["1121"], debit: "150000" }, { accountId: acc["301"], credit: "150000" }] });
+    await GM.post(`/accounting/journal-entries/${je.id}/post`);
     const cat = await F.post("/assets/categories", { companyId: C, code: "DEMO-MACH", nameAr: "DEMO آلات وخطوط إنتاج", usefulLifeMonths: 120,
       assetAccountId: acc["1212"], accumAccountId: acc["1222"], expenseAccountId: acc["5204"], maintenanceAccountId: acc["5203"] });
     const assets = [];

@@ -60,11 +60,12 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 export function StatusBadge({ s }: { s: string }) {
-  const { t } = useI18n();
+  const { t, tt } = useI18n();
   const map: Record<string, [string, string]> = {
     draft: ["warn", t.draft], posted: ["ok", t.posted], reversed: ["bad", t.reversed], open: ["ok", t.open], closed: ["bad", t.closed],
-    active: ["ok", t.active], trial: ["info", "trial"], trialing: ["info", "trial"], past_due: ["warn", "past due"], suspended: ["bad", "suspended"], cancelled: ["bad", "cancelled"],
-    issued: ["warn", "issued"], paid: ["ok", "paid"], superseded: ["", "superseded"],
+    active: ["ok", t.active], trial: ["info", tt("تجريبي", "trial")], trialing: ["info", tt("تجريبي", "trial")], past_due: ["warn", tt("متأخر السداد", "past due")],
+    suspended: ["bad", tt("موقوف", "suspended")], cancelled: ["bad", tt("ملغى", "cancelled")],
+    issued: ["warn", tt("صادرة", "issued")], paid: ["ok", tt("مدفوع", "paid")], superseded: ["", tt("مستبدل", "superseded")],
   };
   const [cls, label] = map[s] ?? ["", s];
   return <span className={`badge ${cls}`}>{label}</span>;
