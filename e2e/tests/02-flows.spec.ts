@@ -22,7 +22,7 @@ test("sales invoice: sales manager drafts, general manager posts", async ({ brow
   await login(g, "gm");
   await g.goto("/sales/invoices");
   await g.locator("select").filter({ hasText: "مسودة" }).first().selectOption("draft");
-  await g.locator("tbody tr").first().click();
+  await g.locator("tbody tr", { hasText: "مسودة" }).first().click();   // wait for the filtered list
   await modal(g).getByRole("button", { name: "ترحيل" }).click();
   await expectToast(g);
   await expect(modal(g).locator(".badge.ok").first()).toBeVisible();
@@ -59,7 +59,7 @@ test("purchase order above the threshold: finance manager approves it", async ({
   await login(page, "finance");
   await page.goto("/purchasing/orders");
   await page.locator(".page-head select").selectOption("pending_approval");
-  await page.locator("tbody tr").first().click();
+  await page.locator("tbody tr", { hasText: "بانتظار الاعتماد" }).first().click();   // wait for the filtered list
   await modal(page).getByRole("button", { name: "اعتماد" }).click();
   await expectToast(page, "اعتُمد");
   await expect(modal(page).getByText("معتمد").first()).toBeVisible();

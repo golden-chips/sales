@@ -64,7 +64,7 @@ jobs:
           POSTGRES_DB: golden_e2e
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U golden_owner" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U golden_owner -d golden_e2e" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       DATABASE_ADMIN_URL: postgres://golden_owner:ci_owner_pw@localhost:5432/golden_e2e
       DATABASE_URL: postgres://golden_app:ci_app_pw@localhost:5432/golden_e2e
