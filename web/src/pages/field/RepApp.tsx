@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { api, fmt } from "../../api";
 import { useI18n } from "../../i18n";
-import { ErrorBox, Field, Loading, Modal, errMsg, useAsync, useToast } from "../../ui";
+import { Empty, ErrorBox, Field, Loading, Modal, errMsg, useAsync, useToast } from "../../ui";
 import { today } from "../erp/shared";
 
 type Op = { clientId: string; type: "invoice" | "receipt" | "visit"; payload: any; label: string; clientTime: string; lastError?: string };
@@ -52,6 +52,8 @@ export default function RepApp() {
   useEffect(() => { if (online && queue.length) sync(); /* eslint-disable-next-line */ }, [online]);
 
   if (day.loading) return <Loading />;
+  if ((day.error as any)?.code === "NOT_A_REP") return <div className="card"><Empty text={tt("هذه الشاشة للمندوبين. حسابك غير مسجل كمندوب — يسجّله مدير المبيعات من «المناديب والمسارات».",
+    "This screen is for field reps. Your account is not registered as a rep — the sales manager can add it under Reps & routes.")} /></div>;
   if (day.error) return <ErrorBox error={day.error} />;
   const d = day.data;
   const pending = new Set(queue.map((o) => o.payload.customerId));

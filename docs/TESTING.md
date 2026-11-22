@@ -121,3 +121,21 @@ Full suite: **92 / 92** in 6 of 8 runs; the 2 failing runs hit the open intermit
 Browser E2E (phone viewport, demo-foods): rep goes offline, records an invoice and a visit (queued, "pending sync"), comes back online → automatic sync, queue empty; the same receipt sent twice → second response `replayed: true` with the same id; totals and custody correct after reload. **The first run of this test exposed that the van held only expired stock and the app displayed it as available — fixed (two rules + demo data).**
 
 > **Note (local development):** PostgreSQL roles are cluster-wide. The test setup sets the password of `golden_app` to `TEST_APP_DB_PASSWORD` (default `test_app_pw`); if the dev and test databases share one PostgreSQL cluster, use the same value in the dev `.env`, otherwise the dev API fails with "password authentication failed" after a test run. Production servers (Docker) have their own cluster and random passwords.
+
+## Browser end-to-end tests (`e2e/`, v0.8)
+Playwright drives the real screens against a running API + web build whose database holds the
+DEMO tenant (`scripts/seed.ts` then `scripts/seed-demo-extras.ts`). They run on every push in the
+CI job `e2e` on a fresh database; failures upload the HTML report, screenshots and the API log.
+
+* `01-screens`: every screen in `web/src/nav.tsx` opens for the general manager (no crash, not
+  empty, no red error box); then each of the 12 DEMO roles opens every screen in its own menu.
+* `02-flows`: invoice drafted by sales and posted by the GM; quotation → order → confirm (stock
+  reserved) → draft invoice; finance approves a PO above the threshold; cashier sells and closes the
+  shift (Z report); production/quality, payroll, field-rep route, trial balance and BI screens.
+
+The flows change data (e.g. the POS shift is closed), so run them on a throw-away copy:
+```bash
+cd web && npm run build && E2E_API_URL=http://localhost:4001 npx vite preview --port 4173 &
+cd server && PORT=4001 DATABASE_URL=…copy… npx tsx src/server.ts &      # LOGIN_RATE_LIMIT_PER_MIN=1000
+cd e2e && npm ci && E2E_BASE_URL=http://localhost:4173 E2E_DEMO_PASSWORD=… npx playwright test
+```

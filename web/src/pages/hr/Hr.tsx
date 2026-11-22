@@ -143,6 +143,8 @@ export function MyHr() {
   const [slip, setSlip] = useState<any>(null);
   const [lv, setLv] = useState<any | null>(null);
   if (me.loading) return <Loading />;
+  if ((me.error as any)?.code === "NOT_AN_EMPLOYEE") return <div className="card"><Empty text={tt("حسابك غير مرتبط بملف موظف بعد. اطلب من الموارد البشرية ربط حسابك بملفك (شاشة الموظفين ← المستخدم) لترى حضورك وراتبك هنا.",
+    "Your account is not linked to an employee record yet. Ask HR to link it (Employees → user) to see your attendance and pay here.")} /></div>;
   if (me.error) return <ErrorBox error={me.error} />;
   const m = me.data;
   const punch = () => {

@@ -36,4 +36,6 @@ export default defineConfig({
     }),
   ],
   server: { port: 5173, proxy: { "/api": "http://localhost:4000" } },
+  // `vite preview` serves the production build (used by the end-to-end tests); E2E_API_URL points it at another API
+  preview: { port: 4173, proxy: { "/api": process.env.E2E_API_URL ?? "http://localhost:4000" } },
 });

@@ -51,3 +51,70 @@ jobs:
           curl -fsS http://localhost/health
           curl -fsS -o /dev/null http://localhost/
           ./backup.sh
+  e2e:
+    # every screen and the key flows in a real browser, against a freshly seeded DEMO tenant
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: golden_owner
+          POSTGRES_PASSWORD: ci_owner_pw
+          POSTGRES_DB: golden_e2e
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U golden_owner" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_ADMIN_URL: postgres://golden_owner:ci_owner_pw@localhost:5432/golden_e2e
+      DATABASE_URL: postgres://golden_app:ci_app_pw@localhost:5432/golden_e2e
+      APP_DB_PASSWORD: ci_app_pw
+      JWT_SECRET: ci-e2e-jwt-secret-0123456789abcdef0123456789
+      PLATFORM_JWT_SECRET: ci-e2e-platform-secret-0123456789abcdef0123
+      PORT: "4000"
+      LOGIN_RATE_LIMIT_PER_MIN: "1000"
+      PLATFORM_ADMIN_EMAIL: admin@ci.example
+      PLATFORM_ADMIN_PASSWORD: Ci!Admin-e2e-2026
+      GOLDEN_OWNER_EMAIL: owner@ci.example
+      GOLDEN_OWNER_PASSWORD: Ci!Owner-e2e-2026
+      DEMO_OWNER_PASSWORD: Ci!Demo-e2e-2026
+      DEMO_REP_PASSWORD: Ci!Rep-e2e-2026
+      E2E_DEMO_PASSWORD: Ci!Demo-e2e-2026
+      E2E_REP_PASSWORD: Ci!Rep-e2e-2026
+      E2E_BASE_URL: http://localhost:4173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: API — install, migrate, seed DEMO data, start
+        working-directory: server
+        run: |
+          npm ci --no-audit --no-fund
+          ./node_modules/.bin/tsx scripts/bootstrap.ts
+          ./node_modules/.bin/tsx scripts/seed.ts
+          ./node_modules/.bin/tsx scripts/seed-demo-extras.ts
+          nohup ./node_modules/.bin/tsx src/server.ts > ../api.log 2>&1 &
+      - name: Web — build and serve
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          nohup npx vite preview --port 4173 > ../web.log 2>&1 &
+      - name: Wait for both
+        run: |
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:4000/health && curl -fsS -o /dev/null http://localhost:4173/ && exit 0; sleep 2; done
+          cat api.log web.log; exit 1
+      - name: Browser tests
+        working-directory: e2e
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          npx playwright test --trace off
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+            api.log
