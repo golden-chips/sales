@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import Fastify, { type FastifyError } from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
@@ -54,7 +55,17 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
 
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(cors, { origin: config.corsOrigins, credentials: false });
-  await app.register(rateLimit, { max: config.globalRateLimitPerMin, timeWindow: "1 minute" });
+  // Limits are per signed-in session, not per IP: a whole factory or shop shares one public IP behind its
+  // router, so an IP limit would block everyone at once. Requests without a token (login attempts, scans)
+  // keep the strict per-IP limit. The bearer token is only hashed into a key here; it is verified later.
+  await app.register(rateLimit, {
+    timeWindow: "1 minute",
+    keyGenerator: (req) => {
+      const h = req.headers.authorization;
+      return h?.startsWith("Bearer ") ? `t:${createHash("sha256").update(h.slice(7)).digest("hex").slice(0, 24)}` : `ip:${req.ip}`;
+    },
+    max: (_req, key) => (key.startsWith("t:") ? config.userRateLimitPerMin : config.globalRateLimitPerMin),
+  });
 
   await app.register(swagger, {
     openapi: {

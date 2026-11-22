@@ -25,6 +25,8 @@ export const config = {
   corsOrigins: (process.env.CORS_ORIGINS ?? "http://localhost:5173").split(",").map((s) => s.trim()).filter(Boolean),
   globalRateLimitPerMin: num("RATE_LIMIT_PER_MIN", 300),
   loginRateLimitPerMin: num("LOGIN_RATE_LIMIT_PER_MIN", 10),
+  /** per signed-in session (users behind one office IP each get their own budget) */
+  userRateLimitPerMin: num("USER_RATE_LIMIT_PER_MIN", 600),
   logLevel: process.env.LOG_LEVEL ?? "info",
 };
 

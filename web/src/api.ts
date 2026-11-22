@@ -42,9 +42,18 @@ export async function request<T = any>(method: string, path: string, body?: unkn
   if (res.status === 401 && scope === "tenant" && getSession("tenant")?.refreshToken && !path.startsWith("/auth/")) {
     if (await refresh()) res = await go();
   }
+  // too many requests: a read is retried once after the server's suggested pause
+  if (res.status === 429 && method === "GET") {
+    const wait = Math.min(Number(res.headers.get("retry-after") ?? 2) || 2, 10);
+    await new Promise((r) => setTimeout(r, wait * 1000));
+    res = await go();
+  }
   const text = await res.text();
-  const json = text ? JSON.parse(text) : null;
+  let json: any = null;
+  try { json = text ? JSON.parse(text) : null; } catch { json = null; }   // e.g. a proxy's HTML error page during an update
   if (!res.ok) {
+    if (res.status === 429) throw new ApiError(429, "RATE_LIMITED", "Too many requests — please wait a few seconds and try again", "طلبات كثيرة خلال وقت قصير — انتظر ثوانيَ ثم أعد المحاولة");
+    if (!json && res.status >= 500) throw new ApiError(res.status, "SERVER_UNAVAILABLE", "The server is not reachable right now — try again shortly", "الخادم غير متاح الآن — أعد المحاولة بعد قليل");
     const e = json?.error ?? {};
     if (res.status === 401) window.dispatchEvent(new CustomEvent("ge:unauthorized", { detail: scope }));
     throw new ApiError(res.status, e.code ?? "HTTP_" + res.status, e.message ?? res.statusText, e.message_ar ?? e.message ?? res.statusText, e.details);

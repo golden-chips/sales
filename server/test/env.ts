@@ -8,6 +8,7 @@ export const testEnv: Record<string, string> = {
   PLATFORM_JWT_SECRET: "test-platform-secret-0123456789abcdef01234",
   LOG_LEVEL: "silent",
   RATE_LIMIT_PER_MIN: "100000",
+  USER_RATE_LIMIT_PER_MIN: "100000",
   LOGIN_RATE_LIMIT_PER_MIN: "100000",
   SIGNUP_RATE_LIMIT_PER_HOUR: "100000",
 };

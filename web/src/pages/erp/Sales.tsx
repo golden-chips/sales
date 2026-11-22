@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { api, fmt } from "../../api";
 import { useI18n } from "../../i18n";
@@ -7,7 +8,8 @@ import { DocList, LinesTable, date, money, today, useLookups } from "./shared";
 
 export default function SalesInvoices() {
   const { t, tt } = useI18n();
-  const [editor, setEditor] = useState(false);
+  const [sp] = useSearchParams();
+  const [editor, setEditor] = useState(sp.get("new") === "1");   // home "quick action" opens the editor directly
   const [ret, setRet] = useState<any | null>(null);
   const [k, setK] = useState(0);
   return (

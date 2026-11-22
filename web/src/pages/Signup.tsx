@@ -37,7 +37,7 @@ export default function Signup() {
     <div className="login-wrap" style={{ alignItems: "start", paddingTop: 32 }}>
       <div className="grid" style={{ width: "min(980px, 100%)", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", alignItems: "start" }}>
         <div className="card grid">
-          <div className="row"><div className="brand" style={{ padding: 0 }}><div className="logo">G</div><div><b>GOLDEN ERP</b><small>{tt("نظام متكامل للمصانع والتجارة والتوزيع", "ERP for manufacturing, trading & distribution")}</small></div></div><span className="spacer" /><TopControls /></div>
+          <div className="row"><div className="brand" style={{ padding: 0 }}><div className="logo">GC</div><div><b>GOLDEN ERP</b><small>{tt("نظام متكامل للمصانع والتجارة والتوزيع", "ERP for manufacturing, trading & distribution")}</small></div></div><span className="spacer" /><TopControls /></div>
           <h1>{trial ? tt(`جرّب مجانًا ${trial.trial_days} يومًا`, `Try free for ${trial.trial_days} days`) : tt("التجربة المجانية", "Free trial")}</h1>
           <p style={{ color: "var(--muted)", margin: 0 }}>{tt("بدون بطاقة دفع. تبدأ فورًا بدليل حسابات وسنة مالية جاهزين، وبياناتك معزولة تمامًا عن الشركات الأخرى.", "No card needed. Start right away with a ready chart of accounts and fiscal year; your data is fully isolated.")}</p>
           {trial && <div className="row">{trial.modules.filter((m: string) => m !== "core").map((m: string) => <span key={m} className="badge info">{lang === "ar" ? MOD_AR[m] ?? m : m}</span>)}</div>}
