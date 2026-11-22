@@ -1,20 +1,37 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, Menu, Search, Moon, Sun, Languages, LogOut, X, CornerDownLeft } from "lucide-react";
+import { ChevronDown, Menu, Search, Moon, Sun, Languages, LogOut, X, CornerDownLeft, SlidersHorizontal } from "lucide-react";
 import { useI18n } from "./i18n";
 import { useSession } from "./session";
 import { HOME, findItem, visibleNav, type NavGroup, type NavItem } from "./nav";
 
 const store = { get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* per-viewer convenience only */ } } };
 
+/** appearance preferences, per user on this device: light/dark/auto, colour theme and text size */
+export type Appearance = { theme: "" | "light" | "dark"; accent: string; scale: "" | "large" | "xlarge" };
+const appearanceListeners = new Set<() => void>();
+let appearance: Appearance = { theme: (store.get("theme") as any) || "", accent: store.get("accent") || "gold", scale: (store.get("scale") as any) || "" };
+function applyAppearance(a: Appearance) {
+  const el = document.documentElement;
+  if (a.theme) el.setAttribute("data-theme", a.theme); else el.removeAttribute("data-theme");
+  el.setAttribute("data-accent", a.accent || "gold");
+  if (a.scale) el.setAttribute("data-scale", a.scale); else el.removeAttribute("data-scale");
+}
+applyAppearance(appearance);
+export function setAppearance(p: Partial<Appearance>) {
+  appearance = { ...appearance, ...p };
+  store.set("theme", appearance.theme); store.set("accent", appearance.accent); store.set("scale", appearance.scale);
+  applyAppearance(appearance);
+  appearanceListeners.forEach((l) => l());
+}
+export function useAppearance() {
+  return useSyncExternalStore((l) => { appearanceListeners.add(l); return () => appearanceListeners.delete(l); }, () => appearance);
+}
+
 export function useTheme() {
-  const [theme, setTheme] = useState<string>(() => store.get("theme") || "");
-  useEffect(() => {
-    if (theme) document.documentElement.setAttribute("data-theme", theme); else document.documentElement.removeAttribute("data-theme");
-    store.set("theme", theme);
-  }, [theme]);
-  const dark = theme === "dark" || (!theme && matchMedia("(prefers-color-scheme: dark)").matches);
-  return { dark, toggle: () => setTheme(dark ? "light" : "dark") };
+  const a = useAppearance();
+  const dark = a.theme === "dark" || (!a.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+  return { dark, toggle: () => setAppearance({ theme: dark ? "light" : "dark" }) };
 }
 
 export function TopControls() {
@@ -154,6 +171,7 @@ export function Shell({ children }: { children: ReactNode }) {
             {userMenu && <div className="dropdown" onMouseLeave={() => setUserMenu(false)}>
               <div className="dropdown-head"><b>{me.user.full_name}</b><small>{me.user.email}</small>
                 {me.companies.length === 1 && <small>{pick(me.companies[0].name_ar, me.companies[0].name_en)}</small>}</div>
+              <button className="dropdown-item" onClick={() => nav("/settings?tab=appearance")}><SlidersHorizontal size={16} />{tt("الإعدادات والمظهر", "Settings & appearance")}</button>
               <MenuPrefs />
               <button className="dropdown-item" onClick={signOut}><LogOut size={16} />{t.logout}</button>
             </div>}

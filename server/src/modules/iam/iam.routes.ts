@@ -23,7 +23,13 @@ export async function iamRoutes(app: FastifyInstance) {
   app.post("/roles", { schema: { ...T, summary: "Create custom role" }, preHandler: can("core.roles.manage") }, async (req, reply) => {
     const b = parse(z.object({ code: z.string().regex(/^[a-z0-9_]+$/), nameAr: z.string().min(2), nameEn: z.string().min(2), permissions: z.array(z.string()).default([]) }), req.body);
     const u = req.user!;
+    // privilege escalation guard (same as editing): you cannot grant what you do not hold yourself
+    const missing = b.permissions.filter((p) => !u.permissions.has(p));
+    if (missing.length && !u.isOwner) throw E.forbidden(missing[0]);
     const role = await tdb(req, async (db) => {
+      const unknown = (await db.query("SELECT x FROM unnest($1::text[]) x WHERE NOT EXISTS (SELECT 1 FROM permissions p WHERE p.code = x)", [b.permissions])).rows;
+      if (unknown.length) throw E.validation([{ path: "permissions", message: `unknown: ${unknown.map((r: any) => r.x).join(", ")}` }]);
+      if ((await db.query("SELECT 1 FROM roles WHERE code = $1", [b.code])).rowCount) throw E.conflict("رمز الدور مستخدم", "Role code already exists");
       const r = (await db.query("INSERT INTO roles (tenant_id, code, name_ar, name_en) VALUES ($1,$2,$3,$4) RETURNING *", [u.tenantId, b.code, b.nameAr, b.nameEn])).rows[0];
       if (b.permissions.length) await db.query("INSERT INTO role_permissions (tenant_id, role_id, permission_code) SELECT $1,$2,unnest($3::text[])", [u.tenantId, r.id, b.permissions]);
       await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "role.created", entityType: "role", entityId: r.id, after: b, ip: req.ip, requestId: req.id });
@@ -39,7 +45,9 @@ export async function iamRoutes(app: FastifyInstance) {
     return tdb(req, async (db) => {
       const r = (await db.query("SELECT * FROM roles WHERE id = $1", [id])).rows[0];
       if (!r) throw E.notFound("role");
-      if (r.code === "tenant_owner") throw E.rule("SYSTEM_ROLE_LOCKED", "لا يمكن تعديل صلاحيات دور المالك", "The tenant owner role cannot be edited");
+      // system roles are templates kept up to date by the system (new permissions are added to them on updates),
+      // so a removal would silently come back: customise a copy instead
+      if (r.is_system) throw E.rule("SYSTEM_ROLE_LOCKED", "الأدوار الجاهزة قوالب يحدّثها النظام — انسخ الدور وعدّل النسخة", "Built-in roles are templates kept up to date by the system — copy the role and edit the copy");
       // privilege escalation guard: you cannot grant what you do not hold yourself
       const missing = b.permissions.filter((p) => !u.permissions.has(p));
       if (missing.length && !u.isOwner) throw E.forbidden(missing[0]);
@@ -47,6 +55,34 @@ export async function iamRoutes(app: FastifyInstance) {
       await db.query("DELETE FROM role_permissions WHERE role_id = $1", [id]);
       if (b.permissions.length) await db.query("INSERT INTO role_permissions (tenant_id, role_id, permission_code) SELECT $1,$2,unnest($3::text[])", [u.tenantId, id, b.permissions]);
       await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "role.permissions_replaced", entityType: "role", entityId: id, before, after: b.permissions, ip: req.ip, requestId: req.id });
+      return { ok: true };
+    });
+  });
+
+  app.patch("/roles/:id", { schema: { ...T, summary: "Rename a custom role" }, preHandler: can("core.roles.manage") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    const b = parse(z.object({ nameAr: z.string().min(2), nameEn: z.string().min(2) }), req.body);
+    const u = req.user!;
+    return tdb(req, async (db) => {
+      const r = (await db.query("UPDATE roles SET name_ar = $2, name_en = $3 WHERE id = $1 AND NOT is_system RETURNING *", [id, b.nameAr, b.nameEn])).rows[0];
+      if (!r) throw E.rule("SYSTEM_ROLE_LOCKED", "لا يمكن تعديل اسم دور جاهز", "Built-in roles cannot be renamed");
+      await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "role.renamed", entityType: "role", entityId: id, after: b, ip: req.ip, requestId: req.id });
+      return r;
+    });
+  });
+
+  app.delete("/roles/:id", { schema: { ...T, summary: "Delete a custom role that no user holds" }, preHandler: can("core.roles.manage") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    const u = req.user!;
+    return tdb(req, async (db) => {
+      const r = (await db.query("SELECT * FROM roles WHERE id = $1", [id])).rows[0];
+      if (!r) throw E.notFound("role");
+      if (r.is_system) throw E.rule("SYSTEM_ROLE_LOCKED", "لا يمكن حذف دور جاهز", "Built-in roles cannot be deleted");
+      const n = Number((await db.query("SELECT count(*) FROM user_roles WHERE role_id = $1", [id])).rows[0].count);
+      if (n) throw E.rule("ROLE_IN_USE", `الدور مسند لـ ${n} مستخدم — أزله منهم أولًا`, `Role is assigned to ${n} users`);
+      await db.query("DELETE FROM role_permissions WHERE role_id = $1", [id]);
+      await db.query("DELETE FROM roles WHERE id = $1", [id]);
+      await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "role.deleted", entityType: "role", entityId: id, before: r, ip: req.ip, requestId: req.id });
       return { ok: true };
     });
   });

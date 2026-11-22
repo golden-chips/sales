@@ -7,7 +7,7 @@ import {
   Factory, FlaskConical, CalendarClock, ShieldCheck, Microscope, AlertTriangle, Route, BookCheck, BarChart3, Sparkles, Contact,
   KanbanSquare, Headset, ListTodo, FolderOpen, Stamp, Briefcase, CheckSquare, ScanBarcode, Clock3, Landmark, TrendingDown, Wrench,
   BookOpen, NotebookPen, Calculator, CalendarRange, Rocket, ClipboardCheck, Upload, UserCog, KeyRound, Building2, ScrollText, CreditCard,
-  Settings2, Banknote, CalendarDays, FileSpreadsheet, ClipboardPen, ShoppingBag,
+  Settings2, Banknote, CalendarDays, FileSpreadsheet, ClipboardPen, ShoppingBag, SlidersHorizontal,
 } from "lucide-react";
 
 export interface NavItem { to: string; ar: string; en: string; icon: LucideIcon; module?: string; perm?: string | string[]; any?: boolean }
@@ -93,6 +93,7 @@ export const NAV: NavGroup[] = [
     { to: "/projects", ar: "المشاريع", en: "Projects", icon: Briefcase, module: "projects", perm: "projects.view" },
   ] },
   { key: "admin", ar: "الإدارة", en: "Administration", icon: Settings2, items: [
+    { to: "/settings", ar: "الإعدادات", en: "Settings", icon: SlidersHorizontal },
     { to: "/go-live", ar: "جاهزية التشغيل", en: "Go-live readiness", icon: Rocket, perm: "core.golive.view" },
     { to: "/uat", ar: "اختبارات القبول", en: "Acceptance tests", icon: ClipboardCheck, perm: "core.uat.record" },
     { to: "/import", ar: "استيراد من Excel", en: "Import from Excel", icon: Upload, any: true,
