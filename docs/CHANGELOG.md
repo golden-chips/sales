@@ -9,6 +9,7 @@
 - `tools/loadtest/pos-rush.mjs` — POS rush-hour load test with correctness checks.
 - **Sign in with a username** (migration 018): e-mail is optional; existing users got the part of their e-mail before "@"; the company code is asked once per device and remembered, or fixed per server with `DEFAULT_TENANT` (one-company installation).
 - Sidebar: one group open at a time.
+- **Refunds on returns** (cash / bank; on credit invoices only the paid excess), **customer credit notes** and **supplier debit notes** (migration 019); the customer statement shows refunds and credit notes; subledgers stay equal to the GL.
 ### Fixed
 - Receipt showed "received / change" with the two numbers in reversed order.
 - Creating a role did not check that the creator holds the permissions granted (editing did).

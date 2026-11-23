@@ -6,6 +6,7 @@ import { E } from "../../core/errors.js";
 import { audit } from "../../core/audit.js";
 import * as sales from "./sales.service.js";
 import * as inv from "./inventory.service.js";
+import * as notes from "./notes.service.js";
 
 const zQty = z.union([z.string(), z.number()]).transform((v) => String(v).trim()).refine((s) => /^-?\d{1,12}(\.\d{1,4})?$/.test(s) && Number(s) !== 0, "non-zero quantity with ≤ 4 decimals");
 const zPos = zQty.refine((s) => !s.startsWith("-"), "must be positive");
@@ -70,9 +71,22 @@ export async function documentRoutes(app: FastifyInstance) {
   });
   registerDoc(app, {
     path: "/sales/returns", table: "sales_returns", tag: "Sales", view: "sales.invoices.view", create: "sales.returns.create", post: "sales.returns.post", dateCol: "return_date",
-    bodySchema: z.object({ invoiceId: zUuid, warehouseId: zUuid, returnDate: zDate, reason: z.string().min(3).max(500), lines: z.array(z.object({ invoiceLineId: zUuid, qty: zPos })).min(1) }),
+    bodySchema: z.object({ invoiceId: zUuid, warehouseId: zUuid, returnDate: zDate, reason: z.string().min(3).max(500), refundMethod: z.enum(["cash", "bank"]).optional(),
+      lines: z.array(z.object({ invoiceLineId: zUuid, qty: zPos })).min(1) }),
     create_: sales.createReturn, post_: sales.postReturn,
     get_: async (db, id) => ({ ...(await db.query("SELECT * FROM sales_returns WHERE id = $1", [id])).rows[0], lines: (await db.query("SELECT * FROM sales_return_lines WHERE doc_id = $1 ORDER BY line_no", [id])).rows }),
+  });
+  // money adjustments after the fact on one posted invoice (K15)
+  const zNote = z.object({ invoiceId: zUuid, noteDate: zDate, amount: zMoney.refine((s) => Number(s) > 0, "> 0"), reason: z.string().min(3).max(500), accountId: zUuid.nullable().optional() });
+  registerDoc(app, {
+    path: "/sales/credit-notes", table: "adjustment_notes", tag: "Sales", view: "sales.invoices.view", create: "sales.notes.create", post: "sales.notes.post", dateCol: "note_date", partyCol: "party_id",
+    extraFilter: "AND x.kind = 'customer_credit'", bodySchema: zNote,
+    create_: (db, u, b) => notes.createNote(db, u, "customer_credit", b), post_: notes.postNote, get_: notes.getNote,
+  });
+  registerDoc(app, {
+    path: "/purchasing/debit-notes", table: "adjustment_notes", tag: "Purchasing", view: "purchasing.receipts.view", create: "purchasing.notes.create", post: "purchasing.notes.post", dateCol: "note_date", partyCol: "party_id",
+    extraFilter: "AND x.kind = 'supplier_debit'", bodySchema: zNote,
+    create_: (db, u, b) => notes.createNote(db, u, "supplier_debit", b), post_: notes.postNote, get_: notes.getNote,
   });
   const zPay = (dir: "in" | "out") => z.object({ companyId: zUuid, partyId: zUuid, method: z.enum(["cash", "bank", "rep_custody"]), paymentDate: zDate, amount: zMoney.refine((s) => Number(s) > 0, "> 0"),
     reference: z.string().max(200).optional(), ...(dir === "in" ? { salesInvoiceId: zUuid.nullable().optional() } : { supplierInvoiceId: zUuid }) }).transform((b) => ({ ...b, direction: dir }));

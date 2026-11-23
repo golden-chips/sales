@@ -24,6 +24,7 @@ import SalesInvoices, { ArAging, Receipts, SalesReturns } from "./pages/erp/Sale
 import PurchaseReceipts, { StockDocuments, SupplierInvoices } from "./pages/erp/Purchasing";
 import { PurchaseOrders, Quotations, SalesOrders } from "./pages/erp/Orders";
 import Settings from "./pages/Settings";
+import { CreditNotes, DebitNotes } from "./pages/erp/Notes";
 import { Formulas, Mrp, ProductionOrders } from "./pages/mfg/Manufacturing";
 import { NonConformances, QualityChecks, QualitySpecs, TraceRecall } from "./pages/mfg/Quality";
 import RepApp from "./pages/field/RepApp";
@@ -65,6 +66,8 @@ export default function App() {
       <Route path="/inventory/stock" element={<Stock />} />
       <Route path="/inventory/documents" element={<StockDocuments />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/sales/credit-notes" element={<CreditNotes />} />
+      <Route path="/purchasing/debit-notes" element={<DebitNotes />} />
       <Route path="/sales/quotations" element={<Quotations />} />
       <Route path="/sales/orders" element={<SalesOrders />} />
       <Route path="/purchasing/orders" element={<PurchaseOrders />} />

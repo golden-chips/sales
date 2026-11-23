@@ -7,7 +7,7 @@ import {
   Factory, FlaskConical, CalendarClock, ShieldCheck, Microscope, AlertTriangle, Route, BookCheck, BarChart3, Sparkles, Contact,
   KanbanSquare, Headset, ListTodo, FolderOpen, Stamp, Briefcase, CheckSquare, ScanBarcode, Clock3, Landmark, TrendingDown, Wrench,
   BookOpen, NotebookPen, Calculator, CalendarRange, Rocket, ClipboardCheck, Upload, UserCog, KeyRound, Building2, ScrollText, CreditCard,
-  Settings2, Banknote, CalendarDays, FileSpreadsheet, ClipboardPen, ShoppingBag, SlidersHorizontal,
+  Settings2, Banknote, CalendarDays, FileSpreadsheet, ClipboardPen, ShoppingBag, SlidersHorizontal, ReceiptText,
 } from "lucide-react";
 
 export interface NavItem { to: string; ar: string; en: string; icon: LucideIcon; module?: string; perm?: string | string[]; any?: boolean }
@@ -28,6 +28,7 @@ export const NAV: NavGroup[] = [
     { to: "/sales/orders", ar: "أوامر البيع", en: "Sales orders", icon: ClipboardPen, module: "sales", perm: "sales.orders.manage" },
     { to: "/sales/invoices", ar: "فواتير المبيعات", en: "Sales invoices", icon: FileText, module: "sales", perm: "sales.invoices.view" },
     { to: "/sales/returns", ar: "مرتجعات المبيعات", en: "Sales returns", icon: Undo2, module: "sales", perm: "sales.invoices.view" },
+    { to: "/sales/credit-notes", ar: "الإشعارات الدائنة", en: "Credit notes", icon: ReceiptText, module: "sales", perm: "sales.invoices.view" },
     { to: "/sales/receipts", ar: "سندات القبض", en: "Customer receipts", icon: Wallet, module: "sales", perm: "sales.invoices.view" },
     { to: "/customers", ar: "العملاء", en: "Customers", icon: Users, module: "sales", perm: "sales.customers.view" },
     { to: "/sales/aging", ar: "أعمار الديون", en: "AR aging", icon: Hourglass, module: "sales", perm: "sales.reports.view" },
@@ -52,6 +53,7 @@ export const NAV: NavGroup[] = [
     { to: "/purchasing/orders", ar: "أوامر الشراء", en: "Purchase orders", icon: ShoppingBag, module: "purchasing", perm: ["purchasing.orders.manage", "purchasing.orders.approve"], any: true },
     { to: "/purchasing/receipts", ar: "أذونات الاستلام", en: "Goods receipts", icon: PackageCheck, module: "purchasing", perm: "purchasing.receipts.view" },
     { to: "/purchasing/invoices", ar: "فواتير الموردين", en: "Supplier invoices", icon: Receipt, module: "purchasing", perm: "purchasing.receipts.view" },
+    { to: "/purchasing/debit-notes", ar: "الإشعارات المدينة", en: "Debit notes", icon: ReceiptText, module: "purchasing", perm: "purchasing.receipts.view" },
     { to: "/suppliers", ar: "الموردون", en: "Suppliers", icon: Building, module: "purchasing", perm: "purchasing.suppliers.view" },
   ] },
   { key: "inventory", ar: "المخازن", en: "Inventory", icon: Boxes, items: [

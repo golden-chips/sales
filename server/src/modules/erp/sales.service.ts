@@ -137,14 +137,14 @@ export async function getInvoice(db: Db, id: string) {
 }
 
 // ------------------------------------------------------------------ returns
-export async function createReturn(db: Db, u: UserCtx, b: { invoiceId: string; warehouseId: string; returnDate: string; reason: string; lines: { invoiceLineId: string; qty: string }[] }) {
+export async function createReturn(db: Db, u: UserCtx, b: { invoiceId: string; warehouseId: string; returnDate: string; reason: string; refundMethod?: "cash" | "bank"; lines: { invoiceLineId: string; qty: string }[] }) {
   const inv = (await db.query("SELECT * FROM sales_invoices WHERE id = $1", [b.invoiceId])).rows[0];
   if (!inv || inv.status !== "posted") throw E.rule("INVOICE_NOT_POSTED", "يمكن الإرجاع من فاتورة مرحّلة فقط", "Returns require a posted invoice");
   const wh = await warehouseOf(db, b.warehouseId, inv.company_id);
   if (wh.kind !== "quarantine")
     throw E.rule("RETURN_MUST_GO_TO_QUARANTINE", "المرتجعات تدخل مخزن الحجر/الفحص فقط، ولا تعود للمخزون الصالح للبيع قبل فحص الجودة", "Customer returns must be received into a quarantine warehouse");
-  const r = (await db.query("INSERT INTO sales_returns (tenant_id, company_id, invoice_id, warehouse_id, return_date, reason, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id",
-    [u.tenantId, inv.company_id, b.invoiceId, b.warehouseId, b.returnDate, b.reason, u.userId])).rows[0];
+  const r = (await db.query("INSERT INTO sales_returns (tenant_id, company_id, invoice_id, warehouse_id, return_date, reason, refund_method, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id",
+    [u.tenantId, inv.company_id, b.invoiceId, b.warehouseId, b.returnDate, b.reason, b.refundMethod ?? null, u.userId])).rows[0];
   const m = await minorUnits(db, inv.company_id);
   let i = 0;
   for (const l of b.lines) {
@@ -190,23 +190,34 @@ export async function postReturn(db: Db, u: UserCtx, id: string, opts: { refundA
     await db.query("UPDATE sales_return_lines SET cost_amount = $2 WHERE id = $1", [l.id, lineCost]);
     cost = (await n(db, "SELECT ($1::numeric + $2::numeric)::text AS t", [cost, lineCost])).t;
   }
+  // what the customer still owes on the invoice is reduced first; anything beyond that was already paid and is refunded
+  let refund = "0";
+  let refundAccount: string | null = null;
   if (inv.payment_type === "credit") {
     const open = (await n(db, "SELECT ($1::numeric - $2::numeric - $3::numeric)::text AS o", [inv.total, inv.amount_paid, inv.amount_returned])).o;
-    if ((await n(db, "SELECT $1::numeric > $2::numeric AS over", [d.total, open])).over)
-      throw E.rule("RETURN_EXCEEDS_OPEN_BALANCE", "قيمة المرتجع تتجاوز الرصيد غير المسدد للفاتورة — يلزم رد نقدي (غير مدعوم بعد)", "Return value exceeds the invoice's open balance (cash refund flow not supported yet)", { open });
-    await db.query("UPDATE sales_invoices SET amount_returned = amount_returned + $2 WHERE id = $1", [inv.id, d.total]);
+    refund = (await n(db, "SELECT greatest($1::numeric - $2::numeric, 0)::text AS r", [d.total, open])).r;
+    if (Number(refund) > 0) {
+      if (!d.refund_method && !opts.refundAccountId)
+        throw E.rule("REFUND_METHOD_REQUIRED", `الفاتورة مسددة: يلزم رد ${refund} للعميل — اختر طريقة الرد (نقدًا أو بالمصرف) في المرتجع`,
+          `The invoice was paid: ${refund} must be refunded — choose cash or bank on the return`, { open, refund });
+      refundAccount = opts.refundAccountId ?? await accountByRole(db, d.company_id, d.refund_method === "bank" ? "bank_main" : "cash_main");
+    }
+    await db.query("UPDATE sales_invoices SET amount_returned = amount_returned + $2, amount_paid = amount_paid - $3 WHERE id = $1", [inv.id, d.total, refund]);
   } else {
+    refund = d.total;
+    refundAccount = opts.refundAccountId ?? await accountByRole(db, d.company_id, d.refund_method === "bank" ? "bank_main" : "cash_main");
     await db.query("UPDATE sales_invoices SET amount_paid = amount_paid - $2, amount_returned = amount_returned + $2 WHERE id = $1", [inv.id, d.total]);
   }
   const number = await docNumber(db, u, d.company_id, "SR", d.return_date);
-  const credit = inv.payment_type === "cash"
-    ? (opts.refundAccountId ?? await accountByRole(db, d.company_id, "cash_main"))
-    : await accountByRole(db, d.company_id, "ar");
+  const ar = await accountByRole(db, d.company_id, "ar");
+  const arPart = (await n(db, "SELECT ($1::numeric - $2::numeric)::text AS a", [d.total, refund])).a;
   const je = await postAccounts(db, u, { companyId: d.company_id, date: d.return_date, memo: `مرتجع مبيعات ${number} على الفاتورة ${inv.number}`, sourceType: "sales_return", sourceId: id, parts: [
-    { accountId: await accountByRole(db, d.company_id, "sales_returns"), amount: d.total }, { accountId: credit, amount: "-" + d.total },
+    { accountId: await accountByRole(db, d.company_id, "sales_returns"), amount: d.total },
+    ...(Number(arPart) > 0 ? [{ accountId: ar, amount: "-" + arPart }] : []),
+    ...(Number(refund) > 0 ? [{ accountId: refundAccount!, amount: "-" + refund }] : []),
     { accountId: await accountByRole(db, d.company_id, "inventory_quarantine"), amount: cost }, { accountId: await accountByRole(db, d.company_id, "cogs"), amount: "-" + cost },
   ] });
-  await markPosted(db, u, "sales_returns", id, number, je, { cost_total: cost });
+  await markPosted(db, u, "sales_returns", id, number, je, { cost_total: cost, refund_amount: refund, refund_account_id: refundAccount });
   await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "sales_return.posted", entityType: "sales_return", entityId: id, after: { number, total: d.total, cost } });
   return (await db.query("SELECT * FROM sales_returns WHERE id = $1", [id])).rows[0];
 }

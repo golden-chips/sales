@@ -89,12 +89,17 @@ function ReturnEditor({ invoice, onClose }: { invoice: any; onClose: () => void 
   const qc = warehouses.filter((w: any) => w.kind === "quarantine");
   const [wh, setWh] = useState("");
   const [reason, setReason] = useState("");
+  const [refund, setRefund] = useState("cash");
   const [qty, setQty] = useState<Record<string, string>>({});
+  // already-paid money comes back to the customer: cash invoices always; credit invoices for what exceeds the open balance
+  const open = Number(invoice.total) - Number(invoice.amount_paid) - Number(invoice.amount_returned);
+  const value = invoice.lines.reduce((a: number, l: any) => a + (Number(qty[l.id]) || 0) * (Number(l.line_total) / Number(l.base_qty)), 0);
+  const refundDue = invoice.payment_type === "cash" ? value : Math.max(0, value - open);
   const [err, setErr] = useState<unknown>(null);
   const save = async () => {
     setErr(null);
     try {
-      await api.post("/sales/returns", { invoiceId: invoice.id, warehouseId: wh || qc[0]?.id, returnDate: today(), reason,
+      await api.post("/sales/returns", { invoiceId: invoice.id, warehouseId: wh || qc[0]?.id, returnDate: today(), reason, ...(refundDue > 0 ? { refundMethod: refund } : {}),
         lines: Object.entries(qty).filter(([, v]) => Number(v) > 0).map(([invoiceLineId, q]) => ({ invoiceLineId, qty: q })) });
       toast(tt("حُفظ المرتجع كمسودة — يُرحّل من صفحة المرتجعات", "Return saved as draft — post it from Returns")); onClose();
     } catch (e) { setErr(e); toast(errMsg(e, lang), true); }
@@ -107,7 +112,10 @@ function ReturnEditor({ invoice, onClose }: { invoice: any; onClose: () => void 
       <div className="form-grid" style={{ marginBottom: 12 }}>
         <Field label={tt("مخزن الحجر", "Quarantine warehouse")}><select value={wh} onChange={(e) => setWh(e.target.value)}>{qc.map((w: any) => <option key={w.id} value={w.id}>{w.code} {w.name_ar}</option>)}</select></Field>
         <Field label={t.reason}><input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+        {refundDue > 0.0005 && <Field label={tt("طريقة رد المبلغ للعميل", "Refund to the customer by")}><select value={refund} onChange={(e) => setRefund(e.target.value)}>
+          <option value="cash">{tt("نقدًا من الخزينة", "Cash from the safe")}</option><option value="bank">{tt("تحويل مصرفي", "Bank transfer")}</option></select></Field>}
       </div>
+      {refundDue > 0.0005 && <div className="alert info">{tt(`سيُرد للعميل ${fmt(refundDue.toFixed(3))} لأنه دفعها مسبقًا`, `${refundDue.toFixed(3)} will be refunded (already paid)`)}{invoice.payment_type === "credit" && open > 0 ? tt(`، ويُخصم الباقي من المتبقي على الفاتورة (${fmt(open.toFixed(3))})`, ` — the rest reduces the open balance (${open.toFixed(3)})`) : ""}.</div>}
       <LinesTable rows={invoice.lines} cols={[{ h: tt("الصنف", "Item"), v: (l) => `${l.item_code} ${l.item_name_ar}` }, { h: tt("المباع (وحدة أساسية)", "Sold (base)"), v: (l) => Number(l.base_qty) },
         { h: tt("الكمية المرتجعة", "Return qty"), v: (l) => <input className="num" style={{ width: 90 }} value={qty[l.id] ?? ""} onChange={(e) => setQty({ ...qty, [l.id]: e.target.value })} /> }]} />
     </Modal>
@@ -117,7 +125,8 @@ function ReturnEditor({ invoice, onClose }: { invoice: any; onClose: () => void 
 export function SalesReturns() {
   const { t, tt } = useI18n();
   return <DocList path="/sales/returns" title={tt("مرتجعات المبيعات", "Sales returns")} createPerm="sales.returns.create" postPerm="sales.returns.post"
-    columns={[{ h: t.date, v: (r) => date(r.return_date) }, { h: t.reason, v: (r) => r.reason }, { h: t.total, v: (r) => money(r.total), end: true }, { h: tt("التكلفة", "Cost"), v: (r) => money(r.cost_total), end: true }]}
+    columns={[{ h: t.date, v: (r) => date(r.return_date) }, { h: t.reason, v: (r) => r.reason }, { h: t.total, v: (r) => money(r.total), end: true },
+      { h: tt("المردود للعميل", "Refunded"), v: (r) => r.refund_amount ? money(r.refund_amount) : (r.refund_method ? tt("عند الترحيل", "on posting") : "—"), end: true }, { h: tt("التكلفة", "Cost"), v: (r) => money(r.cost_total), end: true }]}
     renderDetail={(d) => <LinesTable rows={d.lines} cols={[{ h: "#", v: (l) => l.line_no }, { h: tt("الكمية", "Qty"), v: (l) => Number(l.base_qty) }, { h: t.amount, v: (l) => money(l.amount), end: true }]} />} />;
 }
 
