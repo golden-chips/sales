@@ -14,7 +14,7 @@ export function watchErrors(page: Page) {
 export async function login(page: Page, who: string, password = PW) {
   await page.goto("/login");
   await page.locator("input[autocomplete=organization]").fill(TENANT);
-  await page.locator("input[type=email]").fill(`${who}@demo-foods.example`);
+  await page.locator("input[autocomplete=username]").fill(who);   // sign in by username (e-mail also works)
   await page.locator("input[type=password]").fill(password);
   await page.locator("form button.btn.primary").click();
   await expect(page.locator(".sidebar")).toBeAttached();

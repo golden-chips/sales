@@ -26,11 +26,15 @@ async function issueTokens(db: Db, req: FastifyRequest, tenantId: string, userId
 
 export async function authRoutes(app: FastifyInstance) {
   app.post("/login", {
-    schema: { ...T, security: [], summary: "Tenant user login (tenant code + email + password [+ TOTP])",
-      body: { type: "object", required: ["tenant", "email", "password"], properties: { tenant: { type: "string" }, email: { type: "string" }, password: { type: "string" }, otp: { type: "string" } } } },
+    schema: { ...T, security: [], summary: "Tenant user login (company code + username or e-mail + password [+ TOTP])",
+      body: { type: "object", required: ["tenant", "password"], properties: { tenant: { type: "string" }, login: { type: "string" }, username: { type: "string" }, email: { type: "string" }, password: { type: "string" }, otp: { type: "string" } } } },
     config: { rateLimit: { max: config.loginRateLimitPerMin, timeWindow: "1 minute" } },
   }, async (req) => {
-    const b = parse(z.object({ tenant: z.string().min(3).max(40), email: z.string().email(), password: z.string().min(1).max(200), otp: z.string().optional() }), req.body);
+    const raw = parse(z.object({ tenant: z.string().min(3).max(40), login: z.string().min(1).max(254).optional(), username: z.string().min(1).max(254).optional(), email: z.string().min(1).max(254).optional(),
+      password: z.string().min(1).max(200), otp: z.string().optional() }).refine((x) => !!(x.login ?? x.username ?? x.email), { message: "username or email required", path: ["login"] }), req.body);
+    // one identifier: an e-mail if it has "@", otherwise the username (both case-insensitive)
+    const ident = (raw.login ?? raw.username ?? raw.email)!.trim();
+    const b = { ...raw, email: ident };
     const tenant = await withAnonymous(async (db) => (await db.query("SELECT * FROM resolve_tenant($1)", [b.tenant])).rows[0]);
     if (!tenant) {
       await verifyPassword(b.password, DUMMY_HASH);
@@ -41,7 +45,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     // Outcome is decided inside the transaction; errors are thrown after commit so the attempt/lockout is persisted.
     const outcome = await withTenant(tenant.id, null, async (db) => {
-      const u = (await db.query("SELECT u.*, s.max_failed_logins, s.mfa_required FROM users u JOIN tenant_settings s ON s.tenant_id = u.tenant_id WHERE u.email = $1 FOR UPDATE OF u", [b.email])).rows[0];
+      const u = (await db.query("SELECT u.*, s.max_failed_logins, s.mfa_required FROM users u JOIN tenant_settings s ON s.tenant_id = u.tenant_id WHERE (CASE WHEN position('@' in $1) > 0 THEN u.email = $1::citext ELSE u.username = $1::citext END) FOR UPDATE OF u", [b.email])).rows[0];
       const log = (success: boolean, reason: string | null) => db.query(
         "INSERT INTO login_attempts (tenant_id, scope, identifier, success, reason, ip, user_agent) VALUES ($1,'tenant',$2,$3,$4,$5,$6)",
         [tenant.id, b.email, success, reason, req.ip, req.headers["user-agent"] ?? null]);
@@ -62,7 +66,7 @@ export async function authRoutes(app: FastifyInstance) {
       await log(true, null);
       await audit(db, { tenantId: tenant.id, actorType: "user", actorId: u.id, action: "user.login", entityType: "user", entityId: u.id, ip: req.ip, requestId: req.id });
       const tokens = await issueTokens(db, req, tenant.id, u.id);
-      return { ok: { ...tokens, refreshId: undefined, mfaSetupRequired: u.mfa_required && !u.mfa_enabled, user: { id: u.id, fullName: u.full_name, email: u.email, locale: u.locale } } };
+      return { ok: { ...tokens, refreshId: undefined, mfaSetupRequired: u.mfa_required && !u.mfa_enabled, user: { id: u.id, fullName: u.full_name, email: u.email, username: u.username, locale: u.locale } } };
     });
     if ("err" in outcome) throw outcome.err;
     return outcome.ok;
@@ -101,7 +105,7 @@ export async function authRoutes(app: FastifyInstance) {
     p.get("/me", { schema: { ...T, summary: "Current user, tenant, permissions, plan modules" } }, async (req) => {
       const u = req.user!;
       return withTenant(u.tenantId, u.userId, async (db) => {
-        const me = (await db.query("SELECT id, email, full_name, locale, is_owner, mfa_enabled, last_login_at FROM users WHERE id = $1", [u.userId])).rows[0];
+        const me = (await db.query("SELECT id, email, username, full_name, locale, is_owner, mfa_enabled, last_login_at FROM users WHERE id = $1", [u.userId])).rows[0];
         const tenant = (await db.query("SELECT id, code, legal_name, name_en, status, base_currency, timezone, default_locale, secondary_locale, brand_color, logo_url, is_demo FROM tenants WHERE id = $1", [u.tenantId])).rows[0];
         const companies = (await db.query("SELECT id, code, name_ar, name_en, base_currency FROM companies WHERE is_active ORDER BY code")).rows;
         const roles = (await db.query("SELECT r.code, r.name_ar, r.name_en, ur.branch_id FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = $1", [u.userId])).rows;
@@ -128,7 +132,7 @@ export async function authRoutes(app: FastifyInstance) {
       const u = req.user!;
       const secret = newTotpSecret();
       const email = await withTenant(u.tenantId, u.userId, async (db) => {
-        const r = (await db.query("UPDATE users SET mfa_secret = $2 WHERE id = $1 AND NOT mfa_enabled RETURNING email", [u.userId, secret])).rows[0];
+        const r = (await db.query("UPDATE users SET mfa_secret = $2 WHERE id = $1 AND NOT mfa_enabled RETURNING coalesce(email::text, username::text) AS email", [u.userId, secret])).rows[0];
         if (!r) throw E.conflict("التحقق الثنائي مفعّل مسبقًا", "MFA already enabled");
         return r.email;
       });

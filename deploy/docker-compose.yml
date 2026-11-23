@@ -36,7 +36,10 @@ services:
       TZ: Africa/Tripoli
 
   web:
-    build: ../web
+    build:
+      context: ../web
+      args:
+        VITE_DEFAULT_TENANT: ${DEFAULT_TENANT:-}   # e.g. golden-chips → users sign in with email + password only
     restart: unless-stopped
     depends_on: [api]
     ports:

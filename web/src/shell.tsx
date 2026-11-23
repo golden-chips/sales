@@ -54,7 +54,8 @@ function Sidebar({ groups, open, onClose }: { groups: NavGroup[]; open: boolean;
   const loc = useLocation();
   const activeGroup = findItem(groups, loc.pathname)?.group?.key;
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => { try { return JSON.parse(store.get("nav.expanded") ?? "{}"); } catch { return {}; } });
-  useEffect(() => { if (activeGroup && !expanded[activeGroup]) setExpanded((e) => ({ ...e, [activeGroup]: true })); }, [activeGroup]); // eslint-disable-line react-hooks/exhaustive-deps
+  // one group open at a time (accordion); moving to another screen opens its group
+  useEffect(() => { if (activeGroup && !expanded[activeGroup]) setExpanded({ [activeGroup]: true }); }, [activeGroup]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => store.set("nav.expanded", JSON.stringify(expanded)), [expanded]);
   const name = pick(me!.tenant.legal_name, me!.tenant.name_en);
   const initials = (me!.tenant.code ?? "GE").split(/[-_ ]/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -72,7 +73,7 @@ function Sidebar({ groups, open, onClose }: { groups: NavGroup[]; open: boolean;
         {groups.map((g) => {
           const isOpen = !!expanded[g.key];
           return <div key={g.key} className={`nav-group ${isOpen ? "open" : ""} ${activeGroup === g.key ? "has-active" : ""}`}>
-            <button className="nav-group-btn" onClick={() => setExpanded({ ...expanded, [g.key]: !isOpen })} aria-expanded={isOpen}>
+            <button className="nav-group-btn" onClick={() => setExpanded(isOpen ? {} : { [g.key]: true })} aria-expanded={isOpen}>
               <g.icon size={17} strokeWidth={1.9} /><span>{pick(g.ar, g.en)}</span><ChevronDown size={15} className="chev" />
             </button>
             {isOpen && <div className="nav-items">{g.items.map(link)}</div>}
@@ -169,7 +170,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="user-menu">
             <button className="avatar-btn" onClick={() => setUserMenu(!userMenu)} aria-expanded={userMenu}><span className="avatar">{initials}</span><span className="user-name">{me.user.full_name}</span><ChevronDown size={14} /></button>
             {userMenu && <div className="dropdown" onMouseLeave={() => setUserMenu(false)}>
-              <div className="dropdown-head"><b>{me.user.full_name}</b><small>{me.user.email}</small>
+              <div className="dropdown-head"><b>{me.user.full_name}</b><small dir="ltr">{me.user.username ?? me.user.email}</small>
                 {me.companies.length === 1 && <small>{pick(me.companies[0].name_ar, me.companies[0].name_en)}</small>}</div>
               <button className="dropdown-item" onClick={() => nav("/settings?tab=appearance")}><SlidersHorizontal size={16} />{tt("الإعدادات والمظهر", "Settings & appearance")}</button>
               <MenuPrefs />

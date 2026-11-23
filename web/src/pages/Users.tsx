@@ -5,7 +5,7 @@ import { useSession } from "../session";
 import { Empty, ErrorBox, Field, Loading, Modal, errMsg, useAsync, useToast } from "../ui";
 
 export default function Users() {
-  const { t, pick, lang } = useI18n();
+  const { t, tt, pick, lang } = useI18n();
   const { can, me } = useSession();
   const { toast, confirm } = useToast();
   const [q, setQ] = useState("");
@@ -24,11 +24,11 @@ export default function Users() {
       <ErrorBox error={users.error} />
       {users.loading ? <Loading /> : !users.data?.data.length ? <Empty /> : (
         <div className="table-wrap"><table>
-          <thead><tr><th>{t.fullName}</th><th>{t.email}</th><th>{t.roles}</th><th>{t.mfa}</th><th>{t.lastLogin}</th><th>{t.status}</th>{manage && <th>{t.actions}</th>}</tr></thead>
+          <thead><tr><th>{t.fullName}</th><th>{tt("اسم المستخدم", "Username")}</th><th>{t.email}</th><th>{t.roles}</th><th>{t.mfa}</th><th>{t.lastLogin}</th><th>{t.status}</th>{manage && <th>{t.actions}</th>}</tr></thead>
           <tbody>{users.data.data.map((u: any) => (
             <tr key={u.id}>
               <td>{u.full_name} {u.is_owner && <span className="badge info">{t.owner}</span>}</td>
-              <td className="num">{u.email}</td>
+              <td className="num">{u.username ?? "—"}</td><td className="num">{u.email ?? "—"}</td>
               <td>{u.roles.map((r: any) => <span key={r.roleId + r.branchId} className="badge" style={{ marginInlineEnd: 4 }}>{pick(r.nameAr, r.nameEn)}{r.branchId ? " *" : ""}</span>)}</td>
               <td>{u.mfa_enabled ? t.enabled : t.disabled}</td>
               <td className="num">{fmtDateTime(u.last_login_at)}</td>
@@ -47,16 +47,16 @@ export default function Users() {
 }
 
 function UserModal({ user, roles, branches, onClose, onDone }: { user: any; roles: any[]; branches: any[]; onClose: () => void; onDone: () => void }) {
-  const { t, pick } = useI18n();
+  const { t, tt, pick } = useI18n();
   const isNew = !user.id;
-  const [f, setF] = useState({ email: "", fullName: "", password: "" });
+  const [f, setF] = useState({ username: "", email: "", fullName: "", password: "" });
   const [assign, setAssign] = useState<{ roleId: string; branchId: string | null }[]>(user.roles?.map((r: any) => ({ roleId: r.roleId, branchId: r.branchId })) ?? []);
   const [err, setErr] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true); setErr(null);
     try {
-      if (isNew) await api.post("/users", { ...f, roles: assign });
+      if (isNew) await api.post("/users", { fullName: f.fullName, password: f.password, username: f.username || undefined, email: f.email || undefined, roles: assign });
       else await api.put(`/users/${user.id}/roles`, { roles: assign });
       onDone();
     } catch (e) { setErr(e); } finally { setBusy(false); }
@@ -66,7 +66,8 @@ function UserModal({ user, roles, branches, onClose, onDone }: { user: any; role
       <ErrorBox error={err} />
       {isNew && <div className="form-grid" style={{ marginBottom: 16 }}>
         <Field label={t.fullName}><input value={f.fullName} onChange={(e) => setF({ ...f, fullName: e.target.value })} /></Field>
-        <Field label={t.email}><input dir="ltr" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
+        <Field label={tt("اسم المستخدم (للدخول)", "Username (to sign in)")}><input dir="ltr" autoCapitalize="none" placeholder="ahmed.ali" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, "") })} /></Field>
+        <Field label={tt("البريد الإلكتروني (اختياري)", "E-mail (optional)")}><input dir="ltr" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
         <Field label={t.password}><input dir="ltr" type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></Field>
       </div>}
       <h3>{t.roles}</h3>

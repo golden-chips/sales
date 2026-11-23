@@ -3,6 +3,7 @@
 #   ./setup.sh                 → http://SERVER-IP            (trial)
 #   DOMAIN=erp.example.ly ./setup.sh  → https://erp.example.ly  (automatic certificate)
 #   SEED_DEMO=false ./setup.sh → no DEMO company (production)
+#   DEFAULT_TENANT=golden-chips ./setup.sh → a one-company server: users sign in with email + password only (no company code)
 set -euo pipefail
 cd "$(dirname "$0")"
 command -v docker >/dev/null || { echo "Docker is required: curl -fsSL https://get.docker.com | sh"; exit 1; }
@@ -23,6 +24,7 @@ APP_DB_PASSWORD=$(rnd 32)
 JWT_SECRET=$(rnd 64)
 PLATFORM_JWT_SECRET=$(rnd 64)
 SEED_DEMO=${SEED_DEMO:-true}
+DEFAULT_TENANT=${DEFAULT_TENANT:-}
 ENV
   echo "created deploy/.env with random secrets"
 fi

@@ -7,6 +7,8 @@
 - **Receipt**: new design; choose 80 mm roll or A4 invoice per device; prints alone at the top of the page with no browser header/footer.
 - **Settings page**, **colour themes** with a calm charcoal dark mode, **roles editor** (copy & edit), **plan designer** with module dependency rules, **plan comparison** for customers.
 - `tools/loadtest/pos-rush.mjs` — POS rush-hour load test with correctness checks.
+- **Sign in with a username** (migration 018): e-mail is optional; existing users got the part of their e-mail before "@"; the company code is asked once per device and remembered, or fixed per server with `DEFAULT_TENANT` (one-company installation).
+- Sidebar: one group open at a time.
 ### Fixed
 - Receipt showed "received / change" with the two numbers in reversed order.
 - Creating a role did not check that the creator holds the permissions granted (editing did).

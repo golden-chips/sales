@@ -425,4 +425,5 @@ input.toggle:checked { background: var(--brand); } input.toggle:checked::after {
   :root[data-print="roll"] .receipt-print { width: 80mm; padding: 3mm 4mm; font-size: 11.5px; }
   :root[data-print="a4"] .receipt-print { width: 210mm; padding: 16mm 18mm; font-size: 12.5px; }
 }
-}
+.tenant-chip { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--muted); }
+.tenant-chip b { color: var(--ink); } .tenant-chip .muted-link { margin-inline-start: auto; background: none; border: 0; font: inherit; cursor: pointer; color: var(--brand); }

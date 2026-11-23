@@ -6,6 +6,9 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 ARG VITE_API_BASE=""
 ENV VITE_API_BASE=$VITE_API_BASE
+# company code for a server that serves one company (e.g. erp.golden-chips.ly): users then sign in with email + password only
+ARG VITE_DEFAULT_TENANT=""
+ENV VITE_DEFAULT_TENANT=$VITE_DEFAULT_TENANT
 RUN npm run build
 
 FROM nginx:1.27-alpine

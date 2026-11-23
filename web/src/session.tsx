@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { api, getSession, setSession } from "./api";
 
 export interface Me {
-  user: { id: string; email: string; full_name: string; locale: string; is_owner: boolean; mfa_enabled: boolean };
+  user: { id: string; email: string | null; username: string | null; full_name: string; locale: string; is_owner: boolean; mfa_enabled: boolean };
   tenant: { id: string; code: string; legal_name: string; name_en: string | null; status: string; base_currency: string; timezone: string; brand_color: string | null; is_demo: boolean };
   companies: { id: string; code: string; name_ar: string; name_en: string | null; base_currency: string }[];
   roles: { code: string; name_ar: string; name_en: string; branch_id: string | null }[];

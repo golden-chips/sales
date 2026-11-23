@@ -7,6 +7,7 @@ import { audit } from "../../core/audit.js";
 import { hashPassword, passwordProblems } from "../../core/security.js";
 import { assertWithinLimit } from "../../core/limits.js";
 
+const zUsername = z.string().trim().regex(/^[A-Za-z0-9._-]{2,40}$/, "2–40 letters, digits, . _ -");
 const T = { tags: ["Users & Roles"] };
 const zAssign = z.array(z.object({ roleId: zUuid, branchId: zUuid.nullable().optional() })).max(30);
 
@@ -91,11 +92,11 @@ export async function iamRoutes(app: FastifyInstance) {
     const q = parse(zPage.extend({ q: z.string().optional(), active: z.enum(["true", "false"]).optional() }), req.query);
     const { limit, offset } = pageSql(q);
     return tdb(req, async (db) => {
-      const where = `WHERE ($1::text IS NULL OR u.email ILIKE '%'||$1||'%' OR u.full_name ILIKE '%'||$1||'%') AND ($2::boolean IS NULL OR u.is_active = $2)`;
+      const where = `WHERE ($1::text IS NULL OR u.email ILIKE '%'||$1||'%' OR u.username ILIKE '%'||$1||'%' OR u.full_name ILIKE '%'||$1||'%') AND ($2::boolean IS NULL OR u.is_active = $2)`;
       const args = [q.q ?? null, q.active === undefined ? null : q.active === "true"];
       const total = Number((await db.query(`SELECT count(*) FROM users u ${where}`, args)).rows[0].count);
       const rows = (await db.query(
-        `SELECT u.id, u.email, u.full_name, u.phone, u.locale, u.is_active, u.is_owner, u.mfa_enabled, u.last_login_at, u.locked_until, u.created_at,
+        `SELECT u.id, u.email, u.username, u.full_name, u.phone, u.locale, u.is_active, u.is_owner, u.mfa_enabled, u.last_login_at, u.locked_until, u.created_at,
                 coalesce(json_agg(json_build_object('roleId', r.id, 'code', r.code, 'nameAr', r.name_ar, 'nameEn', r.name_en, 'branchId', ur.branch_id)) FILTER (WHERE r.id IS NOT NULL), '[]') AS roles
            FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN roles r ON r.id = ur.role_id
           ${where} GROUP BY u.id ORDER BY u.created_at LIMIT $3 OFFSET $4`, [...args, limit, offset])).rows;
@@ -104,15 +105,18 @@ export async function iamRoutes(app: FastifyInstance) {
   });
 
   app.post("/users", { schema: { ...T, summary: "Create user (plan user limit enforced)" }, preHandler: can("core.users.manage") }, async (req, reply) => {
-    const b = parse(z.object({ email: z.string().email(), fullName: z.string().min(2), phone: z.string().optional(), password: z.string(), locale: z.enum(["ar", "en"]).default("ar"), roles: zAssign.default([]) }), req.body);
+    const b = parse(z.object({ username: zUsername.optional(), email: z.string().email().optional(), fullName: z.string().min(2), phone: z.string().optional(), password: z.string(),
+      locale: z.enum(["ar", "en"]).default("ar"), roles: zAssign.default([]) }).refine((x) => !!(x.username || x.email), { message: "username or email required", path: ["username"] }), req.body);
     const u = req.user!;
     const created = await tdb(req, async (db) => {
       await assertWithinLimit(db, u.tenantId, "users");
       const s = (await db.query("SELECT password_min_length FROM tenant_settings")).rows[0];
       const probs = passwordProblems(b.password, s.password_min_length);
       if (probs.length) throw E.validation([{ path: "password", message: probs.join(",") }]);
-      const r = (await db.query("INSERT INTO users (tenant_id, email, full_name, phone, password_hash, locale) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, email, full_name",
-        [u.tenantId, b.email.toLowerCase(), b.fullName, b.phone ?? null, await hashPassword(b.password), b.locale])).rows[0];
+      if (b.username && (await db.query("SELECT 1 FROM users WHERE username = $1", [b.username])).rowCount) throw E.conflict("اسم المستخدم مستعمل", "Username already taken");
+      if (b.email && (await db.query("SELECT 1 FROM users WHERE email = $1", [b.email])).rowCount) throw E.conflict("البريد مستعمل لمستخدم آخر", "E-mail already used");
+      const r = (await db.query("INSERT INTO users (tenant_id, email, username, full_name, phone, password_hash, locale) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, email, username, full_name",
+        [u.tenantId, b.email?.toLowerCase() ?? null, b.username?.toLowerCase() ?? null, b.fullName, b.phone ?? null, await hashPassword(b.password), b.locale])).rows[0];
       await assignRoles(db, u, r.id, b.roles);
       await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "user.created", entityType: "user", entityId: r.id, after: { ...b, password: undefined }, ip: req.ip, requestId: req.id });
       return r;
@@ -122,7 +126,8 @@ export async function iamRoutes(app: FastifyInstance) {
 
   app.patch("/users/:id", { schema: { ...T, summary: "Update user / activate / deactivate / unlock" }, preHandler: can("core.users.manage") }, async (req) => {
     const { id } = parse(z.object({ id: zUuid }), req.params);
-    const b = parse(z.object({ fullName: z.string().min(2).optional(), phone: z.string().nullable().optional(), isActive: z.boolean().optional(), unlock: z.boolean().optional(), locale: z.enum(["ar", "en"]).optional() }), req.body);
+    const b = parse(z.object({ fullName: z.string().min(2).optional(), phone: z.string().nullable().optional(), isActive: z.boolean().optional(), unlock: z.boolean().optional(), locale: z.enum(["ar", "en"]).optional(),
+      username: zUsername.optional() }), req.body);
     const u = req.user!;
     return tdb(req, async (db) => {
       const before = (await db.query("SELECT * FROM users WHERE id = $1 FOR UPDATE", [id])).rows[0];
@@ -130,11 +135,13 @@ export async function iamRoutes(app: FastifyInstance) {
       if (before.is_owner && b.isActive === false) throw E.rule("OWNER_CANNOT_BE_DISABLED", "لا يمكن تعطيل مالك الحساب", "The tenant owner cannot be deactivated");
       if (id === u.userId && b.isActive === false) throw E.rule("CANNOT_DISABLE_SELF", "لا يمكنك تعطيل حسابك", "You cannot deactivate yourself");
       if (b.isActive === true && !before.is_active) await assertWithinLimit(db, u.tenantId, "users");
+      if (b.username && (await db.query("SELECT 1 FROM users WHERE username = $1 AND id <> $2", [b.username, id])).rowCount) throw E.conflict("اسم المستخدم مستعمل", "Username already taken");
       const r = (await db.query(
         `UPDATE users SET full_name = coalesce($2, full_name), phone = CASE WHEN $3::boolean THEN $4 ELSE phone END, is_active = coalesce($5, is_active),
-            locale = coalesce($6, locale), failed_logins = CASE WHEN $7 THEN 0 ELSE failed_logins END, locked_until = CASE WHEN $7 THEN NULL ELSE locked_until END
-          WHERE id = $1 RETURNING id, email, full_name, phone, is_active, locale, locked_until`,
-        [id, b.fullName ?? null, b.phone !== undefined, b.phone ?? null, b.isActive ?? null, b.locale ?? null, !!b.unlock])).rows[0];
+            locale = coalesce($6, locale), failed_logins = CASE WHEN $7 THEN 0 ELSE failed_logins END, locked_until = CASE WHEN $7 THEN NULL ELSE locked_until END,
+            username = coalesce($8, username)
+          WHERE id = $1 RETURNING id, email, username, full_name, phone, is_active, locale, locked_until`,
+        [id, b.fullName ?? null, b.phone !== undefined, b.phone ?? null, b.isActive ?? null, b.locale ?? null, !!b.unlock, b.username?.toLowerCase() ?? null])).rows[0];
       if (b.isActive === false) await db.query("UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL", [id]);
       await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "user.updated", entityType: "user", entityId: id, before, after: r, ip: req.ip, requestId: req.id });
       return r;
