@@ -5,9 +5,9 @@ import { useSession } from "../session";
 import { Empty, ErrorBox, Loading, StatusBadge, errMsg, useAsync, useToast } from "../ui";
 
 export default function Periods() {
-  const { t, lang } = useI18n();
+  const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast, confirm } = useToast();
+  const { toast, confirm, ask } = useToast();
   const years = useAsync(() => api.get(`/accounting/fiscal-years?companyId=${companyId}`), [companyId]);
   const [start, setStart] = useState(`${new Date().getFullYear() + 1}-01-01`);
   const manage = can("accounting.periods.manage");
@@ -22,14 +22,18 @@ export default function Periods() {
       <ErrorBox error={years.error} />
       {!years.data?.length ? <div className="card"><Empty /></div> : years.data.map((fy: any) => (
         <div className="card" key={fy.id} style={{ marginBottom: 16 }}>
-          <div className="row"><h2>{fy.name}</h2><StatusBadge s={fy.status} /><span className="num" style={{ color: "var(--muted)" }}>{fy.start_date} → {fy.end_date}</span></div>
+          <div className="row"><h2>{fy.name}</h2><StatusBadge s={fy.status} /><span className="num" style={{ color: "var(--muted)" }}>{fy.start_date} → {fy.end_date}</span><span className="spacer" />
+            {manage && (fy.status === "open"
+              ? <button className="btn primary" onClick={async () => (await confirm(tt(`إقفال السنة ${fy.name}؟ يُنشأ قيد إقفال يحوّل أرصدة الإيرادات والمصروفات إلى الأرباح المحتجزة، وتُقفل كل الفترات.`,
+                  `Close ${fy.name}? A closing entry moves revenue and expense balances to retained earnings and every period is closed.`))) && run(() => api.post(`/accounting/fiscal-years/${fy.id}/close`))}>{tt("إقفال السنة المالية", "Close the year")}</button>
+              : <button className="btn" onClick={async () => { const reason = await ask(tt("سبب إعادة فتح السنة (يُعكس قيد الإقفال)", "Reason to reopen (the closing entry is reversed)"), { minLength: 5, multiline: true }); if (reason) run(() => api.post(`/accounting/fiscal-years/${fy.id}/reopen`, { reason })); }}>{tt("إعادة فتح السنة", "Reopen the year")}</button>)}</div>
           <div className="table-wrap"><table>
             <thead><tr><th>#</th><th>{t.from}</th><th>{t.to}</th><th>{t.status}</th>{manage && <th>{t.actions}</th>}</tr></thead>
             <tbody>{fy.periods.map((p: any) => (
               <tr key={p.id}><td className="num">{p.period_no}</td><td className="num">{p.start_date}</td><td className="num">{p.end_date}</td><td><StatusBadge s={p.status} /></td>
                 {manage && <td>{p.status === "open"
                   ? <button className="btn sm" onClick={async () => (await confirm(`${t.closePeriod} ${p.start_date.slice(0, 7)}?`)) && run(() => api.post(`/accounting/periods/${p.id}/close`))}>{t.closePeriod}</button>
-                  : <button className="btn sm" onClick={() => { const reason = prompt(t.reason); if (reason) run(() => api.post(`/accounting/periods/${p.id}/reopen`, { reason })); }}>{t.reopenPeriod}</button>}</td>}
+                  : <button className="btn sm" onClick={async () => { const reason = await ask(t.reason); if (reason) run(() => api.post(`/accounting/periods/${p.id}/reopen`, { reason })); }}>{t.reopenPeriod}</button>}</td>}
               </tr>))}</tbody>
           </table></div>
         </div>

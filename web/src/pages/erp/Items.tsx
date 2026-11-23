@@ -10,7 +10,7 @@ const KIND_AR: Record<string, string> = { raw: "مادة خام", packaging: "ت
 export default function Items() {
   const { t, tt, pick, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const [q, setQ] = useState("");
   const [kind, setKind] = useState("");
   const [f, setF] = useState<any | null>(null);
@@ -19,7 +19,7 @@ export default function Items() {
   const uoms = useAsync(() => api.get("/uoms"), []);
   const manage = can("inventory.items.manage");
   const addUom = async () => {
-    const code = prompt(tt("رمز الوحدة (مثل BAG أو CTN أو KG)", "Unit code (e.g. BAG, CTN, KG)"))?.trim().toUpperCase();
+    const code = (await ask(tt("رمز الوحدة (مثل BAG أو CTN أو KG)", "Unit code (e.g. BAG, CTN, KG)")))?.trim().toUpperCase();
     if (!code) return;
     try { await api.post("/uoms", { code, nameAr: code }); uoms.reload(); } catch (e) { toast(errMsg(e, lang), true); }
   };

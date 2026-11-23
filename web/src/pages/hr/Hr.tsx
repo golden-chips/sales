@@ -15,7 +15,7 @@ const hm = (m: number | null) => (m === null ? "—" : `${String(Math.floor((((m
 export function Employees() {
   const { t, tt } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const list = useAsync(() => api.get(`/hr/employees?companyId=${companyId}`), [companyId]);
   const deps = useAsync(() => api.get(`/hr/departments?companyId=${companyId}`), [companyId]);
   const schs = useAsync(() => api.get(`/hr/schedules?companyId=${companyId}`), [companyId]);
@@ -59,11 +59,11 @@ export function Employees() {
 function AttendanceModal({ emp, onClose }: { emp: any; onClose: () => void }) {
   const { tt, lang } = useI18n();
   const { can } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const [period, setPeriod] = useState(thisMonth());
   const d = useAsync(() => api.get(`/hr/employees/${emp.id}/attendance?period=${period}`), [emp.id, period]);
   const decide = async (day: string, decision: string) => {
-    const reason = prompt(tt("السبب", "Reason")); if (!reason) return;
+    const reason = await ask(tt("سبب القرار", "Reason"), { minLength: 3 }); if (!reason) return;
     try { await api.put("/hr/decisions", { employeeId: emp.id, day, decision, reason }); d.reload(); } catch (e) { toast(errMsg(e, lang), true); }
   };
   const days = d.data?.days ?? [];
@@ -85,7 +85,7 @@ function AttendanceModal({ emp, onClose }: { emp: any; onClose: () => void }) {
 export function Leaves() {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const [status, setStatus] = useState("submitted");
   const list = useAsync(() => api.get(`/hr/leave-requests?companyId=${companyId}${status ? `&status=${status}` : ""}`), [companyId, status]);
   const act = async (id: string, a: "approve" | "reject") => { try { await api.post(`/hr/leave-requests/${id}/${a}`); list.reload(); toast(t.savedOk); } catch (e) { toast(errMsg(e, lang), true); } };
@@ -103,7 +103,7 @@ export function Leaves() {
 export function Payroll() {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const [period, setPeriod] = useState(thisMonth());
   const [open, setOpen] = useState<string | null>(null);
   const runs = useAsync(() => api.get(`/payroll/runs?companyId=${companyId}`), [companyId]);
@@ -136,7 +136,7 @@ export function Payroll() {
 
 export function MyHr() {
   const { t, tt, lang } = useI18n();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const me = useAsync(() => api.get("/hr/me"), []);
   const [period, setPeriod] = useState(thisMonth());
   const days = useAsync(() => api.get(`/hr/me/attendance?period=${period}`), [period]);

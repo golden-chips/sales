@@ -72,7 +72,8 @@ export function StatusBadge({ s }: { s: string }) {
 }
 
 // ---- toasts + confirm
-const ToastCtx = createContext<{ toast: (m: string, bad?: boolean) => void; confirm: (m: string) => Promise<boolean> }>(null as any);
+type AskOpts = { label?: string; placeholder?: string; initial?: string; minLength?: number; multiline?: boolean };
+const ToastCtx = createContext<{ toast: (m: string, bad?: boolean) => void; confirm: (m: string) => Promise<boolean>; ask: (title: string, o?: AskOpts) => Promise<string | null> }>(null as any);
 export function ToastProvider({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const [items, setItems] = useState<{ id: number; m: string; bad?: boolean }[]>([]);
@@ -84,13 +85,28 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
   const confirm = useCallback((m: string) => new Promise<boolean>((resolve) => setAsk({ m, resolve })), []);
   const done = (v: boolean) => { ask?.resolve(v); setAsk(null); };
+  // in-app text dialog (reasons, numbers…) instead of the browser's prompt()
+  const [text, setText] = useState<{ title: string; o: AskOpts; resolve: (v: string | null) => void } | null>(null);
+  const [value, setValue] = useState("");
+  const askText = useCallback((title: string, o: AskOpts = {}) => new Promise<string | null>((resolve) => { setValue(o.initial ?? ""); setText({ title, o, resolve }); }), []);
+  const finish = (v: string | null) => { text?.resolve(v); setText(null); };
+  const minLen = text?.o.minLength ?? 1;
   return (
-    <ToastCtx.Provider value={{ toast, confirm }}>
+    <ToastCtx.Provider value={{ toast, confirm, ask: askText }}>
       {children}
       <div className="toasts" aria-live="polite">{items.map((i) => <div key={i.id} className={`toast ${i.bad ? "bad" : ""}`}>{i.m}</div>)}</div>
       {ask && (
         <Modal title={t.confirm} onClose={() => done(false)} footer={<><button className="btn" onClick={() => done(false)}>{t.cancel}</button><button className="btn primary" autoFocus onClick={() => done(true)}>{t.confirm}</button></>}>
           {ask.m}
+        </Modal>
+      )}
+      {text && (
+        <Modal title={text.title} onClose={() => finish(null)} footer={<><button className="btn" onClick={() => finish(null)}>{t.cancel}</button>
+          <button className="btn primary" disabled={value.trim().length < minLen} onClick={() => finish(value.trim())}>{t.confirm}</button></>}>
+          <Field label={text.o.label ?? ""}>{text.o.multiline
+            ? <textarea autoFocus rows={3} value={value} placeholder={text.o.placeholder} onChange={(e) => setValue(e.target.value)} />
+            : <input autoFocus value={value} placeholder={text.o.placeholder} onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && value.trim().length >= minLen) finish(value.trim()); }} />}</Field>
         </Modal>
       )}
     </ToastCtx.Provider>

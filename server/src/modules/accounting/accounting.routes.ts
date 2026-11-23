@@ -5,7 +5,9 @@ import { parse, zPage, pageSql, paged, zUuid, zMoney, zDate, idempotent, send, o
 import { E } from "../../core/errors.js";
 import { audit } from "../../core/audit.js";
 import * as svc from "./accounting.service.js";
+import * as rec from "./bankrec.service.js";
 
+const zMoneySigned = z.union([z.string(), z.number()]).transform((v) => String(v).trim()).refine((v) => /^-?\d{1,14}(\.\d{1,4})?$/.test(v), "amount with up to 4 decimals");
 const T = { tags: ["Accounting"] };
 const zLine = z.object({
   accountId: zUuid, debit: zMoney.optional(), credit: zMoney.optional(), description: z.string().max(500).optional(), costCenterId: zUuid.nullable().optional(),
@@ -99,6 +101,81 @@ export async function accountingRoutes(app: FastifyInstance) {
   app.post("/fiscal-years", { schema: { ...T, summary: "Create fiscal year (12 monthly periods)" }, preHandler: can("accounting.periods.manage") }, async (req, reply) => {
     const b = parse(z.object({ companyId: zUuid, name: z.string().min(2).max(40), startDate: zDate }), req.body);
     return reply.code(201).send(await tdb(req, (db) => svc.createFiscalYear(db, req.user!, b)));
+  });
+  // ---------------------------------------------------------------- bank reconciliation (K5)
+  app.get("/bank-statements", { schema: { ...T, summary: "Bank statements with match status" }, preHandler: can("accounting.bank.reconcile") }, async (req) => {
+    const q = parse(z.object({ companyId: zUuid }), req.query);
+    return tdb(req, async (db) => (await db.query(
+      `SELECT s.*, a.code AS account_code, a.name_ar AS account_name, (SELECT count(*) FROM bank_statement_lines b WHERE b.statement_id = s.id)::int AS lines,
+              (SELECT count(*) FROM bank_statement_lines b WHERE b.statement_id = s.id AND b.journal_line_id IS NULL)::int AS unmatched
+         FROM bank_statements s JOIN accounts a ON a.id = s.account_id WHERE s.company_id = $1 ORDER BY s.statement_date DESC LIMIT 200`, [q.companyId])).rows);
+  });
+  app.post("/bank-statements", { schema: { ...T, summary: "Enter a bank statement (opening, closing, lines); auto-matched to the ledger" }, preHandler: can("accounting.bank.reconcile") }, async (req, reply) => {
+    const b = parse(z.object({ companyId: zUuid, accountId: zUuid, statementDate: zDate, reference: z.string().max(100).optional(), openingBalance: zMoneySigned, closingBalance: zMoneySigned,
+      lines: z.array(z.object({ txnDate: zDate, description: z.string().min(1).max(300), reference: z.string().max(100).optional(), amount: zMoneySigned.refine((v) => Number(v) !== 0, "non-zero") })).min(1).max(2000) }), req.body);
+    return reply.code(201).send(await tdb(req, (db) => rec.createStatement(db, req.user!, b)));
+  });
+  app.get("/bank-statements/:id", { schema: { ...T, summary: "Statement with matches, uncleared ledger items and the difference" }, preHandler: can("accounting.bank.reconcile") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    return tdb(req, (db) => rec.getStatement(db, id));
+  });
+  app.post("/bank-statements/:id/auto-match", { schema: { ...T, summary: "Match by amount, nearest date within 7 days" }, preHandler: can("accounting.bank.reconcile") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    return tdb(req, async (db) => ({ ...(await rec.autoMatch(db, req.user!, id)), statement: await rec.getStatement(db, id) }));
+  });
+  app.post("/bank-statement-lines/:id/match", { schema: { ...T, summary: "Match (or unmatch with null) a statement line to a ledger line" }, preHandler: can("accounting.bank.reconcile") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    const b = parse(z.object({ journalLineId: zUuid.nullable() }), req.body);
+    return tdb(req, (db) => rec.matchLine(db, req.user!, id, b.journalLineId));
+  });
+  app.post("/bank-statement-lines/:id/adjust", { schema: { ...T, summary: "Draft adjusting entry for a bank-only item (fees, interest)" }, preHandler: can("accounting.bank.reconcile") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    const b = parse(z.object({ accountId: zUuid, memo: z.string().max(300).optional() }), req.body);
+    if (!req.user!.permissions.has("accounting.journal.create")) throw E.forbidden("accounting.journal.create");
+    return tdb(req, (db) => rec.adjustingEntry(db, req.user!, id, b));
+  });
+  app.post("/bank-statements/:id/reconcile", { schema: { ...T, summary: "Finish: every line matched and no difference" }, preHandler: can("accounting.bank.reconcile") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    return tdb(req, (db) => rec.reconcile(db, req.user!, id));
+  });
+
+  // ---------------------------------------------------------------- budgets (K5)
+  app.get("/budgets", { schema: { ...T, summary: "Budgets" }, preHandler: can("accounting.reports.view") }, async (req) => {
+    const q = parse(z.object({ companyId: zUuid }), req.query);
+    return tdb(req, async (db) => (await db.query(`SELECT b.*, y.name AS year_name, (SELECT coalesce(sum(amount), 0) FROM budget_lines l WHERE l.budget_id = b.id)::numeric(20,4)::text AS total
+        FROM budgets b JOIN fiscal_years y ON y.id = b.fiscal_year_id WHERE b.company_id = $1 ORDER BY y.start_date DESC, b.name`, [q.companyId])).rows);
+  });
+  app.post("/budgets", { schema: { ...T, summary: "Create a budget (optionally from last year's actuals ± growth %)" }, preHandler: can("accounting.budgets.manage") }, async (req, reply) => {
+    const b = parse(z.object({ companyId: zUuid, fiscalYearId: zUuid, name: z.string().min(2).max(100), copyActualFromYearId: zUuid.optional(), growthPct: z.number().min(-100).max(1000).optional() }), req.body);
+    return reply.code(201).send(await tdb(req, (db) => rec.createBudget(db, req.user!, b)));
+  });
+  app.get("/budgets/:id", { schema: { ...T, summary: "Budget with monthly amounts by account" }, preHandler: can("accounting.reports.view") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    return tdb(req, (db) => rec.getBudget(db, id));
+  });
+  app.put("/budgets/:id/lines", { schema: { ...T, summary: "Replace a draft budget's lines (12 monthly amounts per account / cost centre)" }, preHandler: can("accounting.budgets.manage") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    const b = parse(z.object({ lines: z.array(z.object({ accountId: zUuid, costCenterId: zUuid.nullable().optional(), amounts: z.array(zMoney).length(12) })).max(1000) }), req.body);
+    return tdb(req, (db) => rec.setBudgetLines(db, req.user!, id, b.lines));
+  });
+  app.post("/budgets/:id/approve", { schema: { ...T, summary: "Approve a budget (someone other than its preparer)" }, preHandler: can("accounting.budgets.approve") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    return tdb(req, (db) => rec.approveBudget(db, req.user!, id));
+  });
+  app.get("/budgets/:id/vs-actual", { schema: { ...T, summary: "Budget vs actual (YTD and monthly) with variance" }, preHandler: can("accounting.reports.view") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    const q = parse(z.object({ asOf: zDate.optional() }), req.query);
+    return tdb(req, (db) => rec.budgetVsActual(db, id, q.asOf));
+  });
+
+  app.post("/fiscal-years/:id/close", { schema: { ...T, summary: "Year-end close: closing entry to retained earnings, all periods and the year closed" }, preHandler: can("accounting.periods.manage") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    return tdb(req, (db) => svc.closeFiscalYear(db, req.user!, id));
+  });
+  app.post("/fiscal-years/:id/reopen", { schema: { ...T, summary: "Reopen a closed year (reverses the closing entry; reason required)" }, preHandler: can("accounting.periods.manage") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    const b = parse(z.object({ reason: z.string().min(5).max(500) }), req.body);
+    return tdb(req, (db) => svc.reopenFiscalYear(db, req.user!, id, b.reason));
   });
   app.post("/periods/:id/close", { schema: { ...T, summary: "Close fiscal period (blocked while drafts exist)" }, preHandler: can("accounting.periods.manage") }, async (req) => {
     const { id } = parse(z.object({ id: zUuid }), req.params);

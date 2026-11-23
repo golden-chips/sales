@@ -7,7 +7,7 @@ import {
   Factory, FlaskConical, CalendarClock, ShieldCheck, Microscope, AlertTriangle, Route, BookCheck, BarChart3, Sparkles, Contact,
   KanbanSquare, Headset, ListTodo, FolderOpen, Stamp, Briefcase, CheckSquare, ScanBarcode, Clock3, Landmark, TrendingDown, Wrench,
   BookOpen, NotebookPen, Calculator, CalendarRange, Rocket, ClipboardCheck, Upload, UserCog, KeyRound, Building2, ScrollText, CreditCard,
-  Settings2, Banknote, CalendarDays, FileSpreadsheet, ClipboardPen, ShoppingBag, SlidersHorizontal, ReceiptText, Container,
+  Settings2, Banknote, CalendarDays, FileSpreadsheet, ClipboardPen, ShoppingBag, SlidersHorizontal, ReceiptText, Container, PiggyBank,
 } from "lucide-react";
 
 export interface NavItem { to: string; ar: string; en: string; icon: LucideIcon; module?: string; perm?: string | string[]; any?: boolean }
@@ -87,6 +87,8 @@ export const NAV: NavGroup[] = [
     { to: "/accounts", ar: "دليل الحسابات", en: "Chart of accounts", icon: BookOpen, module: "accounting", perm: "accounting.accounts.view" },
     { to: "/journal", ar: "القيود اليومية", en: "Journal entries", icon: NotebookPen, module: "accounting", perm: "accounting.journal.view" },
     { to: "/trial-balance", ar: "ميزان المراجعة", en: "Trial balance", icon: Calculator, module: "accounting", perm: "accounting.reports.view" },
+    { to: "/bank-reconciliation", ar: "التسويات البنكية", en: "Bank reconciliation", icon: Landmark, module: "accounting", perm: "accounting.bank.reconcile" },
+    { to: "/budgets", ar: "الموازنات التقديرية", en: "Budgets", icon: PiggyBank, module: "accounting", perm: "accounting.reports.view" },
     { to: "/periods", ar: "السنوات والفترات", en: "Fiscal periods", icon: CalendarRange, module: "accounting", perm: "accounting.journal.view" },
   ] },
   { key: "reports", ar: "التقارير والمستندات", en: "Reports & documents", icon: BarChart3, items: [

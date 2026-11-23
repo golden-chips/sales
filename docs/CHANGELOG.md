@@ -12,6 +12,7 @@
 - **Refunds on returns** (cash / bank; on credit invoices only the paid excess), **customer credit notes** and **supplier debit notes** (migration 019); the customer statement shows refunds and credit notes; subledgers stay equal to the GL.
 - **Purchase price variance** (final supplier invoice) and **landed costs** (migration 020): spread over the receipt's goods still on hand, the used share to stock differences. Supplier invoice is now entered in a proper form (no browser prompt).
 - **POS offline**: keeps selling without a connection (cash/card), provisional receipt, automatic sending when back online, rejected sales listed for review, shift close blocked while sales wait; the app also reopens offline after a reload (last profile kept on the device).
+- **Year-end close** and reopen; **bank reconciliation** (paste the statement, automatic matching, adjusting entries, uncleared cheques, reconcile); **budgets** (monthly, copy last year ± %, approval, budget vs actual) — migration 021. Financial statements computed in SQL. Every browser `prompt()` replaced by an in-app dialog.
 ### Fixed
 - Receipt showed "received / change" with the two numbers in reversed order.
 - Creating a role did not check that the creator holds the permissions granted (editing did).

@@ -34,7 +34,7 @@ function PLogin({ onIn }: { onIn: () => void }) {
 
 function Console({ onOut }: { onOut: () => void }) {
   const { t, pick, lang } = useI18n();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<string | null>(null);
   const [prov, setProv] = useState(false);
@@ -80,8 +80,8 @@ function Console({ onOut }: { onOut: () => void }) {
         </table></div>}
       </div>
       {sel && <Modal title={detail.data?.tenant.legal_name ?? "…"} onClose={() => setSel(null)} footer={detail.data && <>
-        {detail.data.tenant.status !== "suspended" ? <button className="btn danger" onClick={() => { const r = prompt(t.reason); if (r) act("suspend", { reason: r }); }}>{t.suspend}</button>
-          : <button className="btn primary" onClick={() => { const r = prompt(t.reason); if (r) act("reactivate", { reason: r }); }}>{t.reactivate}</button>}
+        {detail.data.tenant.status !== "suspended" ? <button className="btn danger" onClick={async () => { const r = await ask(t.reason); if (r) act("suspend", { reason: r }); }}>{t.suspend}</button>
+          : <button className="btn primary" onClick={async () => { const r = await ask(t.reason); if (r) act("reactivate", { reason: r }); }}>{t.reactivate}</button>}
         <select id="cp" style={{ width: "auto" }} defaultValue="">{[<option key="" value="">{t.changePlan}…</option>, ...(plans.data ?? []).map((p: any) => <option key={p.code} value={p.code}>{p.code}</option>)]}</select>
         <button className="btn" onClick={() => { const v = (document.getElementById("cp") as HTMLSelectElement).value; if (v) act("change-plan", { planCode: v }); }}>{t.changePlan}</button>
       </>}>

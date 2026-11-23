@@ -19,7 +19,7 @@ function useLabels() {
 export function CrmLeads() {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const L = useLabels();
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
@@ -28,7 +28,7 @@ export function CrmLeads() {
   const list = useAsync(() => api.get(`/crm/leads?companyId=${companyId}${status ? `&status=${status}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`), [companyId, status, q]);
   const move = async (id: string, s: string) => {
     try {
-      const lostReason = s === "lost" ? window.prompt(tt("سبب الفقد", "Reason lost")) ?? "" : undefined;
+      const lostReason = s === "lost" ? (await ask(tt("سبب الفقد", "Reason lost"), { minLength: 2 })) ?? "" : undefined;
       if (s === "lost" && !lostReason) return;
       await api.post(`/crm/leads/${id}/status`, { status: s, lostReason }); list.reload();
     } catch (e) { toast(errMsg(e, lang), true); }
@@ -58,7 +58,7 @@ export function CrmLeads() {
 function NewLead({ onClose }: { onClose: () => void }) {
   const { t, tt, lang } = useI18n();
   const { companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const camps = useAsync(() => api.get(`/crm/campaigns?companyId=${companyId}`), [companyId]);
   const [f, setF] = useState({ name: "", businessName: "", phone: "", city: "", source: "rep_visit", campaignId: "", notes: "" });
   const [err, setErr] = useState<unknown>(null);
@@ -86,7 +86,7 @@ function NewLead({ onClose }: { onClose: () => void }) {
 
 function Convert({ lead, onClose }: { lead: any; onClose: () => void }) {
   const { t, tt, lang } = useI18n();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const [f, setF] = useState({ customerCode: "", creditLimit: "", paymentTermsDays: "0" });
   const save = async () => {
     try { const r = await api.post(`/crm/leads/${lead.id}/convert`, { customerCode: f.customerCode, creditLimit: f.creditLimit || undefined, paymentTermsDays: Number(f.paymentTermsDays) }); toast(`${t.savedOk} — ${r.customer.code}`); onClose(); }
@@ -104,14 +104,14 @@ function Convert({ lead, onClose }: { lead: any; onClose: () => void }) {
 export function CrmPipeline() {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const L = useLabels();
   const opps = useAsync(() => api.get(`/crm/opportunities?companyId=${companyId}`), [companyId]);
   const pipe = useAsync(() => api.get(`/crm/pipeline?companyId=${companyId}`), [companyId]);
   const [creating, setCreating] = useState(false);
   const move = async (o: any, stage: string) => {
     try {
-      const lostReason = stage === "lost" ? window.prompt(tt("سبب الخسارة", "Reason lost")) ?? "" : undefined;
+      const lostReason = stage === "lost" ? (await ask(tt("سبب الخسارة", "Reason lost"), { minLength: 2 })) ?? "" : undefined;
       if (stage === "lost" && !lostReason) return;
       await api.post(`/crm/opportunities/${o.id}/stage`, { stage, lostReason }); opps.reload(); pipe.reload();
     } catch (e) { toast(errMsg(e, lang), true); }
@@ -143,7 +143,7 @@ export function CrmPipeline() {
 function NewOpportunity({ onClose }: { onClose: () => void }) {
   const { t, tt, lang } = useI18n();
   const { companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const leads = useAsync(() => api.get(`/crm/leads?companyId=${companyId}`), [companyId]);
   const custs = useAsync(() => api.get(`/customers?companyId=${companyId}&pageSize=200`), [companyId]);
   const [f, setF] = useState({ title: "", party: "", expectedValue: "", expectedClose: "" });
@@ -170,7 +170,7 @@ function NewOpportunity({ onClose }: { onClose: () => void }) {
 export function CrmTickets() {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const L = useLabels();
   const [status, setStatus] = useState("open");
   const [creating, setCreating] = useState(false);
@@ -179,13 +179,13 @@ export function CrmTickets() {
   const stats = useAsync(() => api.get(`/crm/service-stats?companyId=${companyId}&from=${year}-01-01&to=${new Date().toISOString().slice(0, 10)}`), [companyId]);
   const act = async (tk: any, s: string) => {
     try {
-      const resolution = s === "resolved" ? window.prompt(tt("الحل / ما تم", "Resolution")) ?? "" : undefined;
+      const resolution = s === "resolved" ? (await ask(tt("الحل / ما تم", "Resolution"), { minLength: 3, multiline: true })) ?? "" : undefined;
       if (s === "resolved" && !resolution) return;
       await api.post(`/crm/tickets/${tk.id}/status`, { status: s, resolution }); list.reload(); stats.reload();
     } catch (e) { toast(errMsg(e, lang), true); }
   };
   const rate = async (tk: any) => {
-    const score = Number(window.prompt(tt("رضا العميل من 1 إلى 5", "Customer satisfaction 1–5")) ?? "");
+    const score = Number((await ask(tt("رضا العميل من 1 إلى 5", "Customer satisfaction 1–5"), { placeholder: "5" })) ?? "");
     if (!score) return;
     try { await api.post(`/crm/tickets/${tk.id}/feedback`, { score }); list.reload(); stats.reload(); } catch (e) { toast(errMsg(e, lang), true); }
   };
@@ -217,7 +217,7 @@ export function CrmTickets() {
 function NewTicket({ onClose }: { onClose: () => void }) {
   const { t, tt, lang } = useI18n();
   const { companyId, me } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const L = useLabels();
   const custs = useAsync(() => api.get(`/customers?companyId=${companyId}&pageSize=200`), [companyId]);
   const lots = useAsync(() => api.get(`/inventory/lots?companyId=${companyId}`).catch(() => []), [companyId]);
@@ -247,7 +247,7 @@ function NewTicket({ onClose }: { onClose: () => void }) {
 export function CrmMyActivities() {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const list = useAsync(() => api.get(`/crm/activities?companyId=${companyId}&mine=true&open=true`), [companyId]);
   const [f, setF] = useState({ kind: "call", subject: "", dueAt: "" });
   const add = async () => {

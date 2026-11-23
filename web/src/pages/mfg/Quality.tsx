@@ -37,7 +37,7 @@ export function QualityChecks() {
 function RecordCheck({ onClose }: { onClose: () => void }) {
   const { t, tt, lang } = useI18n();
   const { companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const stageL = useStageLabel();
   const [q, setQ] = useState("");
   const [lot, setLot] = useState<any | null>(null);
@@ -81,7 +81,7 @@ function RecordCheck({ onClose }: { onClose: () => void }) {
 export function QualitySpecs() {
   const { t, tt, lang } = useI18n();
   const { can } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const { items } = useLookups();
   const stageL = useStageLabel();
   const [itemId, setItemId] = useState("");
@@ -121,7 +121,7 @@ export function QualitySpecs() {
 export function NonConformances() {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const [status, setStatus] = useState("open");
   const [close, setClose] = useState<any | null>(null);
   const list = useAsync(() => api.get(`/quality/ncrs?companyId=${companyId}${status ? `&status=${status}` : ""}`), [companyId, status]);
@@ -152,14 +152,14 @@ export function NonConformances() {
 export function TraceRecall() {
   const { tt, t, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast, confirm } = useToast();
+  const { toast, confirm, ask } = useToast();
   const [q, setQ] = useState("");
   const [lotId, setLotId] = useState<string | null>(null);
   const lots = useAsync(() => api.get(`/inventory/lots?companyId=${companyId}${q ? `&q=${encodeURIComponent(q)}` : ""}`), [companyId, q]);
   const trace = useAsync(() => (lotId ? api.get(`/quality/trace/${lotId}`) : Promise.resolve(null)), [lotId]);
   const recalls = useAsync(() => api.get(`/quality/recalls?companyId=${companyId}`), [companyId]);
   const recall = async () => {
-    const reason = prompt(tt("سبب الاستدعاء", "Recall reason")); if (!reason) return;
+    const reason = await ask(tt("سبب الاستدعاء", "Recall reason"), { minLength: 3, multiline: true }); if (!reason) return;
     if (!(await confirm(tt("سيتم إيقاف كل التشغيلات المشتقة فورًا ومنع بيعها واستخدامها. متابعة؟", "Every derived lot will be put on hold immediately (no sale, no production use). Continue?")))) return;
     try { const r = await api.post("/quality/recalls", { companyId, lotId, reason }); toast(`${r.number}: ${r.forward.lots.length} ${tt("تشغيلة موقوفة", "lots on hold")}`); trace.reload(); recalls.reload(); lots.reload(); }
     catch (e) { toast(errMsg(e, lang), true); }

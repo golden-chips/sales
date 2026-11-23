@@ -14,7 +14,7 @@ const show = (u: bigint) => { const neg = u < 0n; const a = neg ? -u : u; const 
 export default function Journal() {
   const { t, pick, lang } = useI18n();
   const { can, companyId, me } = useSession();
-  const { toast, confirm } = useToast();
+  const { toast, confirm, ask } = useToast();
   const [sp, setSp] = useSearchParams();
   const [filters, setFilters] = useState({ status: sp.get("status") ?? "", q: "", from: "", to: "" });
   const [page, setPage] = useState(1);
@@ -31,7 +31,7 @@ export default function Journal() {
       if (kind === "post") { await api.post(`/accounting/journal-entries/${e.id}/post`, {}, { idempotencyKey: `post-${e.id}` }); toast(t.postedOk); }
       if (kind === "delete") { if (!(await confirm(`${t.delete}?`))) return; await api.del(`/accounting/journal-entries/${e.id}`); setOpenId(null); }
       if (kind === "reverse") {
-        const reason = prompt(t.reason);
+        const reason = await ask(t.reason, { minLength: 3 });
         if (!reason) return;
         await api.post(`/accounting/journal-entries/${e.id}/reverse`, { reason }, { idempotencyKey: `rev-${e.id}` });
         toast(t.savedOk);

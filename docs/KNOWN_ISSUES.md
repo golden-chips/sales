@@ -5,9 +5,9 @@
 | K1 | High (pre-prod) | Refresh token kept in `sessionStorage` in the web app | httpOnly cookie + CSRF token before production |
 | K2 | Medium | Rate limiting is in-memory per instance; per-tenant `api_rpm` not enforced | Redis store + tenant key generator |
 | K3 | Medium | MFA secrets not encrypted at rest (RLS-protected) | App-level encryption with KMS key |
-| K4 | Medium | Financial statements summary computed in JS numbers after SQL aggregation (rounded to 4 dp) | Move final arithmetic into SQL `numeric` |
-| K5 | Medium | Year-end close, bank reconciliation, budgets, unrealized FX, fixed assets: not implemented | Phase 2 remainder |
-| K6 | Medium | Reverse / reopen reasons use the browser `prompt()` dialog | Replace with in-app modal |
+| K4 | ~~Medium~~ **Resolved (0.9)** | Financial statements arithmetic is done in SQL numeric | — |
+| K5 | ~~Medium~~ **Mostly resolved (0.9)** | Year-end close (closing entry to retained earnings, reopen with reason), bank reconciliation (statement entry/paste, auto-match ±7 days, adjusting drafts, uncleared items, reconcile), budgets (monthly by account, copy from last year ± %, approval, budget vs actual) are done (migration 021); fixed assets since 0.6. Still missing: unrealized FX revaluation | Later |
+| K6 | ~~Medium~~ **Resolved (0.9)** | All reasons and short inputs use an in-app dialog | — |
 | K7 | ~~Low~~ **Partly done (0.9)** | POS rush load test (`tools/loadtest/pos-rush.mjs`) on a 4-core dev machine (API + DB + generator together): 20 cashiers selling every ~3 s → 600 sales, p99 123 ms, max 169 ms, 0 errors; flat-out 10 cashiers with no pause → 30 sales/s, p50 117 ms, p99 3.7 s. Invoices, stock and drawer cash matched exactly; 100 concurrent double-submits were never recorded twice. Not yet load-tested: the other modules, and the real production server | Repeat on the production server before go-live |
 | K8 | Low | Backup/restore procedure documented but not drilled (no production env yet) | Go-live gate |
 | K9 | Info | Plan prices are 0 placeholders | Owner decision D4 |
@@ -18,7 +18,7 @@
 | K14 | ~~Medium~~ **Resolved (0.9)** | A supplier invoice marked final books the price variance; landed costs (shipping, customs) are spread over a receipt by value or quantity — both onto stock still on hand, the used share to stock differences (migration 020). Value-only changes are logged in `stock_value_adjustments` (not yet shown on the item card) | — |
 | K15 | ~~Medium~~ **Resolved (0.9)** | Returns of paid invoices refund in cash or by bank (only the paid excess on credit invoices); customer credit notes and supplier debit notes against one posted invoice (migration 019). Charging a customer more = an invoice with a service item | — |
 | K16 | Low | Serial numbers, bin locations, multiple price lists not implemented | Later |
-| K17 | Low | Some UI inputs (supplier invoice number, unit codes, recall reason, work center) use browser `prompt()` | Replace with modals |
+| K17 | ~~Low~~ **Resolved (0.9)** | No browser `prompt()` left; the supplier invoice has its own form | — |
 | K18 | Medium | Capacity planning, line scheduling, shifts, downtime/OEE, by-products not implemented | Phase 3 remainder |
 | K19 | Medium | Weighted average is per warehouse+item, so all lots of an item share one cost (lot-level actual cost not supported) | Option for lot costing later if required |
 | K20 | Medium | Recall notices are queued in the outbox but **not sent**: the WhatsApp sender (company's Meta account) is not connected yet | Connect sender worker |

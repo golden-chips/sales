@@ -62,7 +62,7 @@ function OrderList({ path, title, statuses, partyLabel, newLabel, canCreate, onN
 /** runs an action, toasts the outcome, reloads */
 function useAct() {
   const { lang } = useI18n();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   return async (fn: () => Promise<unknown>, okMsg: string, reload: () => void) => {
     try { await fn(); toast(okMsg); reload(); } catch (e) { toast(errMsg(e, lang), true); }
   };
@@ -80,6 +80,7 @@ export function Quotations() {
   const { tt } = useI18n();
   const { can } = useSession();
   const act = useAct();
+  const { ask } = useToast();
   const { warehouses } = useLookups();
   const [editor, setEditor] = useState(false);
   const [k, setK] = useState(0);
@@ -96,7 +97,7 @@ export function Quotations() {
         {d.reject_reason && <div className="alert">{tt("سبب الرفض", "Reason")}: {d.reject_reason}</div>}
         {["draft", "sent"].includes(d.status) && <div className="row">
           {d.status === "draft" && <button className="btn" onClick={() => act(() => api.post(`/sales-quotations/${d.id}/send`, {}), tt("عُلِّم كمرسل", "Marked as sent"), reload)}>{tt("تم الإرسال للعميل", "Mark as sent")}</button>}
-          <button className="btn danger" onClick={() => { const r = prompt(tt("سبب رفض العميل", "Customer's reason")); if (r) act(() => api.post(`/sales-quotations/${d.id}/reject`, { reason: r }), tt("سُجّل الرفض", "Rejected"), reload); }}>{tt("رفض العميل", "Rejected")}</button>
+          <button className="btn danger" onClick={async () => { const r = await ask(tt("سبب رفض العميل", "Customer's reason")); if (r) act(() => api.post(`/sales-quotations/${d.id}/reject`, { reason: r }), tt("سُجّل الرفض", "Rejected"), reload); }}>{tt("رفض العميل", "Rejected")}</button>
           {can("sales.orders.manage") && !d.expired && <button className="btn primary" onClick={() => act(() => api.post(`/sales-quotations/${d.id}/convert`, { warehouseId: sellable[0]?.id, orderDate: today() }),
             tt("أُنشئ أمر بيع مسودة — راجعه في أوامر البيع", "Draft sales order created — see Sales orders"), reload)}>{tt("قَبِل العميل: حوّل إلى أمر بيع", "Accepted: convert to order")}</button>}
         </div>}
@@ -110,6 +111,7 @@ export function SalesOrders() {
   const { tt } = useI18n();
   const { can } = useSession();
   const act = useAct();
+  const { ask } = useToast();
   const [editor, setEditor] = useState(false);
   const [k, setK] = useState(0);
   return <>
@@ -130,7 +132,7 @@ export function SalesOrders() {
           {d.status === "draft" && <button className="btn" onClick={() => act(() => api.post(`/sales-orders/${d.id}/confirm`, { allowBackorder: true }), tt("تأكّد الأمر (طلب مؤجل)", "Confirmed as backorder"), reload)}>{tt("تأكيد كطلب مؤجل", "Confirm as backorder")}</button>}
           {["confirmed", "partially_delivered"].includes(d.status) && can("sales.invoices.create") && <button className="btn primary" onClick={() => act(() => api.post(`/sales-orders/${d.id}/invoice`, { invoiceDate: today() }),
             tt("أُنشئت فاتورة مسودة بالكميات المتبقية", "Draft invoice created for the remaining quantities"), reload)}>{tt("فوترة المتبقي", "Invoice remaining")}</button>}
-          {!["delivered", "closed", "cancelled"].includes(d.status) && <button className="btn danger" onClick={() => { const r = prompt(tt("سبب الإلغاء / الإغلاق", "Reason")); if (r) act(() => api.post(`/sales-orders/${d.id}/close`, { reason: r }), tt("أُغلق الأمر", "Order closed"), reload); }}>
+          {!["delivered", "closed", "cancelled"].includes(d.status) && <button className="btn danger" onClick={async () => { const r = await ask(tt("سبب الإلغاء / الإغلاق", "Reason")); if (r) act(() => api.post(`/sales-orders/${d.id}/close`, { reason: r }), tt("أُغلق الأمر", "Order closed"), reload); }}>
             {d.status === "partially_delivered" ? tt("إغلاق المتبقي", "Close the rest") : tt("إلغاء الأمر", "Cancel order")}</button>}
         </div>
       </>} />
@@ -194,6 +196,7 @@ export function PurchaseOrders() {
   const { tt } = useI18n();
   const { can, me } = useSession();
   const act = useAct();
+  const { ask } = useToast();
   const [editor, setEditor] = useState(false);
   const [receiving, setReceiving] = useState<any>(null);
   const [k, setK] = useState(0);
@@ -216,9 +219,9 @@ export function PurchaseOrders() {
           {d.status === "draft" && can("purchasing.orders.manage") && <button className="btn primary" onClick={() => act(() => api.post(`/purchase-orders/${d.id}/submit`, {}), tt("أُرسل الأمر", "Submitted"), reload)}>{tt("إرسال للاعتماد", "Submit")}</button>}
           {d.status === "pending_approval" && can("purchasing.orders.approve") && d.created_by !== me!.user.id && <>
             <button className="btn primary" onClick={() => act(() => api.post(`/purchase-orders/${d.id}/decide`, { decision: "approved" }), tt("اعتُمد الأمر", "Approved"), reload)}>{tt("اعتماد", "Approve")}</button>
-            <button className="btn danger" onClick={() => { const r = prompt(tt("سبب الرفض", "Reason")); if (r) act(() => api.post(`/purchase-orders/${d.id}/decide`, { decision: "rejected", reason: r }), tt("رُفض الأمر", "Rejected"), reload); }}>{tt("رفض", "Reject")}</button></>}
+            <button className="btn danger" onClick={async () => { const r = await ask(tt("سبب الرفض", "Reason")); if (r) act(() => api.post(`/purchase-orders/${d.id}/decide`, { decision: "rejected", reason: r }), tt("رُفض الأمر", "Rejected"), reload); }}>{tt("رفض", "Reject")}</button></>}
           {["approved", "partially_received"].includes(d.status) && can("purchasing.receipts.create") && <button className="btn primary" onClick={() => setReceiving(d)}>{tt("استلام بضاعة", "Receive goods")}</button>}
-          {!["received", "closed", "cancelled", "rejected"].includes(d.status) && can("purchasing.orders.manage") && <button className="btn danger" onClick={() => { const r = prompt(tt("السبب", "Reason")); if (r) act(() => api.post(`/purchase-orders/${d.id}/close`, { reason: r }), tt("أُغلق الأمر", "Closed"), reload); }}>
+          {!["received", "closed", "cancelled", "rejected"].includes(d.status) && can("purchasing.orders.manage") && <button className="btn danger" onClick={async () => { const r = await ask(tt("السبب", "Reason")); if (r) act(() => api.post(`/purchase-orders/${d.id}/close`, { reason: r }), tt("أُغلق الأمر", "Closed"), reload); }}>
             {d.status === "partially_received" ? tt("إغلاق المتبقي", "Close the rest") : tt("إلغاء", "Cancel")}</button>}
         </div>
       </>} />

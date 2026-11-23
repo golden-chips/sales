@@ -286,24 +286,80 @@ export async function accountLedger(db: Db, accountId: string, from: string, to:
   return { account: acc, from, to, opening, lines };
 }
 
-/** Income statement and balance sheet derived from the ledger (same source of truth as the trial balance). */
+/** year-end closing entries (and their reversals) are not part of a year's income statement */
+const NOT_CLOSING = `NOT (e.source_type = 'year_end_close' OR (e.source_type = 'reversal' AND EXISTS (SELECT 1 FROM journal_entries c WHERE c.id = e.reversal_of AND c.source_type = 'year_end_close')))`;
+
+/** Income statement and balance sheet derived from the ledger (same source of truth as the trial balance).
+ *  All arithmetic is done in SQL numeric (K4); figures are returned as numbers rounded to 4 dp. */
 export async function financialStatements(db: Db, companyId: string, from: string, to: string) {
   const r = (await db.query(
-    `SELECT a.type,
-            sum(CASE WHEN e.entry_date BETWEEN $2 AND $3 THEN l.credit - l.debit ELSE 0 END) AS period_credit_net,
-            sum(l.debit - l.credit) AS cumulative_debit_net
-       FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id JOIN accounts a ON a.id = l.account_id
-      WHERE e.company_id = $1 AND ${POSTED} AND e.entry_date <= $3 GROUP BY a.type`, [companyId, from, to])).rows;
-  const by = Object.fromEntries(r.map((x) => [x.type, x]));
-  const n = (v: unknown) => Number(v ?? 0);
-  const revenue = n(by.revenue?.period_credit_net), expenses = -n(by.expense?.period_credit_net);
-  const assets = n(by.asset?.cumulative_debit_net), liabilities = -n(by.liability?.cumulative_debit_net), equity = -n(by.equity?.cumulative_debit_net);
-  const unclosedEarnings = -n(by.revenue?.cumulative_debit_net) - n(by.expense?.cumulative_debit_net);
-  const round = (x: number) => Math.round(x * 10000) / 10000;
+    `WITH t AS (
+       SELECT a.type,
+              sum(CASE WHEN e.entry_date BETWEEN $2 AND $3 AND ${NOT_CLOSING} THEN l.credit - l.debit ELSE 0 END) AS period_credit_net,
+              sum(l.debit - l.credit) AS cumulative_debit_net
+         FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id JOIN accounts a ON a.id = l.account_id
+        WHERE e.company_id = $1 AND ${POSTED} AND e.entry_date <= $3 GROUP BY a.type),
+     v AS (SELECT coalesce(sum(period_credit_net) FILTER (WHERE type = 'revenue'), 0) AS revenue,
+                  coalesce(-sum(period_credit_net) FILTER (WHERE type = 'expense'), 0) AS expenses,
+                  coalesce(sum(cumulative_debit_net) FILTER (WHERE type = 'asset'), 0) AS assets,
+                  coalesce(-sum(cumulative_debit_net) FILTER (WHERE type = 'liability'), 0) AS liabilities,
+                  coalesce(-sum(cumulative_debit_net) FILTER (WHERE type = 'equity'), 0) AS equity,
+                  coalesce(-sum(cumulative_debit_net) FILTER (WHERE type IN ('revenue', 'expense')), 0) AS unclosed FROM t)
+     SELECT round(revenue, 4)::text AS revenue, round(expenses, 4)::text AS expenses, round(revenue - expenses, 4)::text AS net,
+            round(assets, 4)::text AS assets, round(liabilities, 4)::text AS liabilities, round(equity, 4)::text AS equity, round(unclosed, 4)::text AS unclosed,
+            (assets = liabilities + equity + unclosed) AS balanced FROM v`, [companyId, from, to])).rows[0];
+  const n = Number;
   return {
     from, to,
-    incomeStatement: { revenue: round(revenue), expenses: round(expenses), netIncome: round(revenue - expenses) },
-    balanceSheet: { assets: round(assets), liabilities: round(liabilities), equity: round(equity), unclosedEarnings: round(unclosedEarnings),
-      balanced: Math.abs(assets - (liabilities + equity + unclosedEarnings)) < 0.00005 },
+    incomeStatement: { revenue: n(r.revenue), expenses: n(r.expenses), netIncome: n(r.net) },
+    balanceSheet: { assets: n(r.assets), liabilities: n(r.liabilities), equity: n(r.equity), unclosedEarnings: n(r.unclosed), balanced: r.balanced },
   };
+}
+
+// ------------------------------------------------------------------ year-end close (K5)
+/** Moves the year's revenue and expense balances to retained earnings in one closing entry dated the last
+ *  day of the year, then closes every period and the year. Requires no draft entries in the year. */
+export async function closeFiscalYear(db: Db, u: UserCtx, fyId: string) {
+  const fy = (await db.query("SELECT * FROM fiscal_years WHERE id = $1 FOR UPDATE", [fyId])).rows[0];
+  if (!fy) throw E.notFound("fiscal year");
+  if (fy.status === "closed") throw E.rule("YEAR_CLOSED", "السنة المالية مقفلة مسبقًا", "Fiscal year is already closed");
+  const start = String(fy.start_date).slice(0, 10), end = String(fy.end_date).slice(0, 10);
+  const drafts = Number((await db.query("SELECT count(*) FROM journal_entries WHERE company_id = $1 AND status = 'draft' AND entry_date BETWEEN $2 AND $3", [fy.company_id, start, end])).rows[0].count);
+  if (drafts) throw E.rule("DRAFTS_EXIST", `توجد ${drafts} قيود مسودة في السنة — رحّلها أو احذفها قبل الإقفال`, `${drafts} draft entries in the year — post or delete them first`, { drafts });
+  const bal = (await db.query(
+    `SELECT a.id, a.code, sum(l.debit - l.credit)::numeric(20,4) AS b FROM journal_lines l JOIN journal_entries e ON e.id = l.entry_id JOIN accounts a ON a.id = l.account_id
+      WHERE e.company_id = $1 AND ${POSTED} AND e.entry_date BETWEEN $2 AND $3 AND a.type IN ('revenue', 'expense') AND ${NOT_CLOSING}
+      GROUP BY a.id HAVING sum(l.debit - l.credit) <> 0 ORDER BY a.code`, [fy.company_id, start, end])).rows;
+  let entry = null;
+  if (bal.length) {
+    const re = (await db.query("SELECT id FROM accounts WHERE company_id = $1 AND role = 'retained_earnings' AND is_postable AND is_active", [fy.company_id])).rows[0];
+    if (!re) throw E.rule("NO_RETAINED_EARNINGS", "لا يوجد حساب «أرباح محتجزة» (role retained_earnings) في دليل الحسابات", "No retained earnings account in the chart of accounts");
+    const net = (await db.query("SELECT sum(b)::numeric(20,4)::text AS n FROM unnest($1::numeric[]) b", [bal.map((x) => x.b)])).rows[0].n as string;
+    const lines: LineInput[] = bal.map((x) => (Number(x.b) > 0 ? { accountId: x.id, credit: String(x.b) } : { accountId: x.id, debit: String(-Number(x.b)) }));
+    // net > 0: expenses exceeded revenue (a loss) → retained earnings is debited; a profit credits it
+    if (Number(net) !== 0) lines.push(Number(net) > 0 ? { accountId: re.id, debit: net } : { accountId: re.id, credit: String(-Number(net)) });
+    const attempt = Number((await db.query("SELECT count(*) FROM journal_entries WHERE company_id = $1 AND source_type = 'year_end_close' AND source_id LIKE $2", [fy.company_id, `${fy.id}%`])).rows[0].count) + 1;
+    const r = await postFromSource(db, u, { companyId: fy.company_id, entryDate: end, memo: `قيد إقفال السنة المالية ${fy.name}`, sourceType: "year_end_close", sourceId: `${fy.id}#${attempt}`, lines });
+    entry = r.entry;
+    // the posting checks are deferred to commit; run them now, while the last period is still open
+    await db.query("SET CONSTRAINTS trg_gl_validate_posting IMMEDIATE");
+  }
+  await db.query("UPDATE fiscal_periods SET status = 'closed', closed_at = coalesce(closed_at, now()), closed_by = coalesce(closed_by, $2) WHERE fiscal_year_id = $1", [fy.id, u.userId]);
+  await db.query("UPDATE fiscal_years SET status = 'closed' WHERE id = $1", [fy.id]);
+  await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "fiscal_year.closed", entityType: "fiscal_year", entityId: fy.id, after: { closingEntry: entry?.number ?? null } });
+  return { year: (await db.query("SELECT * FROM fiscal_years WHERE id = $1", [fy.id])).rows[0], closingEntry: entry };
+}
+
+/** Reopens a closed year: the last period is reopened and the closing entry reversed (reason required, audited). */
+export async function reopenFiscalYear(db: Db, u: UserCtx, fyId: string, reason: string) {
+  const fy = (await db.query("SELECT * FROM fiscal_years WHERE id = $1 FOR UPDATE", [fyId])).rows[0];
+  if (!fy) throw E.notFound("fiscal year");
+  if (fy.status !== "closed") throw E.rule("YEAR_OPEN", "السنة المالية مفتوحة", "Fiscal year is open");
+  await db.query("UPDATE fiscal_years SET status = 'open' WHERE id = $1", [fy.id]);
+  await db.query("UPDATE fiscal_periods SET status = 'open', closed_at = NULL, closed_by = NULL WHERE fiscal_year_id = $1 AND end_date = $2", [fy.id, fy.end_date]);
+  const closing = (await db.query("SELECT id FROM journal_entries WHERE company_id = $1 AND source_type = 'year_end_close' AND source_id LIKE $2 AND status = 'posted' ORDER BY created_at DESC LIMIT 1",
+    [fy.company_id, `${fy.id}%`])).rows[0];
+  if (closing) await reverseEntry(db, u, closing.id, { reason: `إعادة فتح السنة: ${reason}`, reversalDate: String(fy.end_date).slice(0, 10) });
+  await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "fiscal_year.reopened", entityType: "fiscal_year", entityId: fy.id, after: { reason } });
+  return (await db.query("SELECT * FROM fiscal_years WHERE id = $1", [fy.id])).rows[0];
 }

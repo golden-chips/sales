@@ -9,7 +9,7 @@ import { LinesTable, today, useLookups } from "../erp/shared";
 export function Formulas() {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const { items } = useLookups();
   const list = useAsync(() => api.get(`/manufacturing/boms?companyId=${companyId}`), [companyId]);
   const [open, setOpen] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export function Formulas() {
 export function ProductionOrders() {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const { items, warehouses } = useLookups();
   const [status, setStatus] = useState("");
   const [open, setOpen] = useState<string | null>(null);
@@ -88,8 +88,8 @@ export function ProductionOrders() {
   };
   const qc = warehouses.filter((w: any) => w.kind === "quarantine");
   const addWc = async () => {
-    const code = prompt(tt("رمز الخط (مثل LINE1)", "Line code (e.g. LINE1)"))?.toUpperCase(); if (!code) return;
-    const rate = prompt(tt("تكلفة الساعة (عمالة + طاقة + غير مباشرة)", "Cost per hour (labour + energy + overhead)"), "0") ?? "0";
+    const code = (await ask(tt("رمز الخط (مثل LINE1)", "Line code (e.g. LINE1)")))?.toUpperCase(); if (!code) return;
+    const rate = (await ask(tt("تكلفة الساعة (عمالة + طاقة + غير مباشرة)", "Cost per hour (labour + energy + overhead)"), { initial: "0" })) ?? "0";
     try { await api.post("/manufacturing/work-centers", { companyId, code, nameAr: code, ratePerHour: rate }); wcs.reload(); } catch (e) { toast(errMsg(e, lang), true); }
   };
   return <>
@@ -124,7 +124,7 @@ export function ProductionOrders() {
 function OrderDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const { t, tt, lang } = useI18n();
   const { can } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const d = useAsync(() => api.get(`/manufacturing/orders/${id}`), [id]);
   const cost = useAsync(() => api.get(`/manufacturing/orders/${id}/cost`), [id]);
   const [issue, setIssue] = useState({ itemId: "", qty: "" });

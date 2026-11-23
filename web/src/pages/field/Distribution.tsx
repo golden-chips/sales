@@ -10,7 +10,7 @@ const thisMonth = () => new Date().toISOString().slice(0, 7);
 export function Reps() {
   const { t, tt } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const reps = useAsync(() => api.get(`/distribution/reps?companyId=${companyId}`), [companyId]);
   const [f, setF] = useState<any | null>(null);
   const [route, setRoute] = useState<any | null>(null);
@@ -92,7 +92,7 @@ export function Performance() {
 export function Settlements() {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const [status, setStatus] = useState("submitted");
   const [open, setOpen] = useState<string | null>(null);
   const list = useAsync(() => api.get(`/distribution/settlements?companyId=${companyId}${status ? `&status=${status}` : ""}`), [companyId, status]);
@@ -100,7 +100,7 @@ export function Settlements() {
   const detail = useAsync(() => (open ? api.get(`/distribution/settlements/${open}`) : Promise.resolve(null)), [open]);
   const approve = async () => { try { await api.post(`/distribution/settlements/${open}/approve`); toast(t.savedOk); detail.reload(); list.reload(); } catch (e) { toast(errMsg(e, lang), true); } };
   const confirmCash = async (h: any) => {
-    const counted = prompt(`${tt("المبلغ المعدود فعليًا (المصرّح", "Counted amount (declared")} ${fmt(h.declared_amount)})`, String(Number(h.declared_amount)));
+    const counted = await ask(`${tt("المبلغ المعدود فعليًا (المصرّح", "Counted amount (declared")} ${fmt(h.declared_amount)})`, { initial: String(Number(h.declared_amount)) });
     if (!counted) return;
     try { const r = await api.post(`/distribution/handovers/${h.id}/confirm`, { countedAmount: counted }); toast(Number(r.shortage) > 0 ? `${tt("عجز", "Shortage")} ${fmt(r.shortage)}` : t.savedOk, Number(r.shortage) > 0); hand.reload(); }
     catch (e) { toast(errMsg(e, lang), true); }
@@ -128,7 +128,7 @@ export function Settlements() {
 export function Commissions() {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
-  const { toast } = useToast();
+  const { toast, ask } = useToast();
   const [period, setPeriod] = useState(thisMonth());
   const [open, setOpen] = useState<string | null>(null);
   const runs = useAsync(() => api.get(`/distribution/commission-runs?companyId=${companyId}`), [companyId]);
