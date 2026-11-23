@@ -1,4 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { Banknote, Check, CreditCard, Landmark, Minus, Plus, Printer, Smartphone, UserRound } from "lucide-react";
 import { api, fmt, fmtDateTime } from "../../api";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
@@ -70,6 +72,10 @@ function Counter({ report, reload }: { report: any; reload: () => void }) {
     for (const i of items) { const u = (i.units ?? []).find((x: any) => x.barcode === code); if (u) { add(i, u); setQ(""); return; } }
     toast(`${tt("باركود غير معروف", "Unknown barcode")}: ${code}`, true);
   };
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "F9" && cart.length && !paying && !receipt) { e.preventDefault(); setPaying(true); } };
+    window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
+  }, [cart.length, paying, receipt]);
   const done = (r: any) => { setPaying(false); setCart([]); setReceipt(r); reload(); scan.current?.focus(); };
 
   return <>
@@ -81,7 +87,7 @@ function Counter({ report, reload }: { report: any; reload: () => void }) {
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 3fr) minmax(280px, 2fr)", gap: 16 }} className="pos-grid">
       <div>
         <input ref={scan} autoFocus placeholder={tt("امسح الباركود أو ابحث بالاسم/الرمز ثم Enter", "Scan a barcode or search, then Enter")} value={q}
-          onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && q.trim()) onScan(q.trim()); }} style={{ fontSize: 18, padding: 12, marginBottom: 12 }} />
+          onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { if (q.trim()) onScan(q.trim()); else if (cart.length) setPaying(true); } }} style={{ fontSize: 18, padding: 12, marginBottom: 12 }} />
         <ErrorBox error={catalog.error} />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
           {(catalog.data ?? []).map((it: any) => <div key={it.id} className="card" style={{ padding: 10, cursor: Number(it.available) > 0 ? "pointer" : "not-allowed", opacity: Number(it.available) > 0 ? 1 : 0.5 }}
@@ -98,79 +104,200 @@ function Counter({ report, reload }: { report: any; reload: () => void }) {
         {!cart.length ? <Empty text={tt("امسح صنفًا للبدء", "Scan an item to start")} /> : <div className="table-wrap"><table>
           <thead><tr><th>{tt("الصنف", "Item")}</th><th className="end">{tt("الكمية", "Qty")}</th><th className="end">{tt("خصم %", "Disc %")}</th><th className="end">{t.total}</th><th /></tr></thead>
           <tbody>{cart.map((l) => <tr key={l.key}><td>{l.label}<div className="num" style={{ fontSize: 11, color: "var(--muted)" }}>{fmt(l.unitPrice * l.factor)}</div></td>
-            <td className="end"><input className="num" style={{ width: 60 }} value={l.qty} onChange={(e) => setCart(cart.map((x) => x.key === l.key ? { ...x, qty: Number(e.target.value) || 0 } : x))} /></td>
+            <td className="end"><div className="qty-step"><button className="btn sm" onClick={() => setCart(cart.map((x) => x.key === l.key ? { ...x, qty: Math.max(1, x.qty - 1) } : x))} aria-label="−"><Minus size={14} /></button>
+              <input className="num" style={{ width: 52 }} value={l.qty} onChange={(e) => setCart(cart.map((x) => x.key === l.key ? { ...x, qty: Number(e.target.value) || 0 } : x))} />
+              <button className="btn sm" onClick={() => setCart(cart.map((x) => x.key === l.key ? { ...x, qty: x.qty + 1 } : x))} aria-label="+"><Plus size={14} /></button></div></td>
             <td className="end"><input className="num" style={{ width: 50 }} value={l.discountPct} onChange={(e) => setCart(cart.map((x) => x.key === l.key ? { ...x, discountPct: Number(e.target.value) || 0 } : x))} /></td>
             <td className="end num">{fmt(lineTotal(l))}</td><td><button className="btn" onClick={() => setCart(cart.filter((x) => x.key !== l.key))}>✕</button></td></tr>)}</tbody></table></div>}
         <div style={{ marginTop: "auto", paddingTop: 12 }}>
           <div className="row" style={{ justifyContent: "space-between", fontSize: 24 }}><b>{t.total}</b><b className="num">{fmt(total)}</b></div>
           <div className="alert info" style={{ fontSize: 12 }}>{tt("السعر النهائي يُحسب على الخادم (سعر العميل الخاص إن وجد).", "The server computes the final price (special customer price if any).")}</div>
-          <button className="btn primary" style={{ width: "100%", fontSize: 18, padding: 12 }} disabled={!cart.length || cart.some((l) => l.qty <= 0)} onClick={() => setPaying(true)}>{tt("الدفع", "Pay")}</button>
+          <button className="btn primary" style={{ width: "100%", fontSize: 18, padding: 12 }} disabled={!cart.length || cart.some((l) => l.qty <= 0)} onClick={() => setPaying(true)}>{tt("الدفع", "Pay")} <kbd>F9</kbd></button>
         </div>
       </div>
     </div>
-    {paying && <Pay shiftId={shift.id} cart={cart} estimate={total} onClose={() => setPaying(false)} onDone={done} />}
-    {receipt && <Receipt data={receipt} onClose={() => setReceipt(null)} />}
+    {paying && <Pay shiftId={shift.id} cart={cart} estimate={total} methods={report.paymentMethods ?? []} legacyCard={!!report.legacyCard} onClose={() => setPaying(false)} onDone={done} />}
+    {receipt && <Receipt data={receipt} onClose={() => { setReceipt(null); setTimeout(() => scan.current?.focus(), 50); }} />}
     {closing && <CloseShift report={report} onClose={() => setClosing(false)} onDone={() => { setClosing(false); reload(); }} />}
     {returning && <PosReturn shiftId={shift.id} companyId={companyId ?? ""} onClose={() => { setReturning(false); reload(); }} />}
   </>;
 }
 
-function Pay({ shiftId, cart, estimate, onClose, onDone }: { shiftId: string; cart: CartLine[]; estimate: number; onClose: () => void; onDone: (r: any) => void }) {
+type PayLine = { key: string; kind: "cash" | "method" | "card" | "credit"; methodId?: string; label: string; amount: string };
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** payment: one tap per method (cash, each card/wallet the cashier may take, on account), split allowed,
+ *  big "received" box with quick notes, live change / still-due. Enter confirms when fully paid. */
+function Pay({ shiftId, cart, estimate, methods, legacyCard, onClose, onDone }: { shiftId: string; cart: CartLine[]; estimate: number; methods: any[]; legacyCard: boolean;
+  onClose: () => void; onDone: (r: any) => void }) {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
   const { toast } = useToast();
   const [clientId] = useState(uuid);   // same id on retry → the server never sells twice
-  const customers = useAsync(() => (can("pos.sales.credit") ? api.get(`/customers?companyId=${companyId}&pageSize=200`) : Promise.resolve({ data: [] })), [companyId]);
+  const canCredit = can("pos.sales.credit");
+  const customers = useAsync(() => (canCredit ? api.get(`/customers?companyId=${companyId}&pageSize=200`) : Promise.resolve({ data: [] })), [companyId]);
+  const [total, setTotal] = useState(estimate);
+  const [lines, setLines] = useState<PayLine[]>([{ key: "cash", kind: "cash", label: tt("نقدًا", "Cash"), amount: String(estimate) }]);
+  const [tendered, setTendered] = useState("");
   const [customerId, setCustomerId] = useState("");
-  const [card, setCard] = useState("0");
-  const [credit, setCredit] = useState("0");
-  const [tendered, setTendered] = useState(String(estimate));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<unknown>(null);
-  const cash = Math.max(0, Math.round((estimate - Number(card || 0) - Number(credit || 0)) * 1000) / 1000);
+  const tenderRef = useRef<HTMLInputElement>(null);
+  const paid = r3(lines.reduce((a, l) => a + (Number(l.amount) || 0), 0));
+  const remaining = r3(total - paid);
+  const cashLine = lines.find((l) => l.kind === "cash");
+  const cash = Number(cashLine?.amount || 0);
+  const got = tendered === "" ? cash : Number(tendered) || 0;
+  const change = r3(got - cash);
+  const creditLine = lines.find((l) => l.kind === "credit");
+  const ready = remaining === 0 && paid > 0 && change >= 0 && (!creditLine || !!customerId) && !busy;
+
+  /** tapping a method adds it with whatever is still due (or the whole total if nothing is due yet and it is the only line) */
+  const tap = (l: Omit<PayLine, "amount">) => {
+    const exists = lines.find((x) => x.key === l.key);
+    if (exists) return;
+    if (remaining > 0) setLines([...lines, { ...l, amount: String(remaining) }]);
+    else if (lines.length === 1 && lines[0].kind === "cash") setLines([{ ...l, amount: String(total) }]);   // switch cash → this method
+    else setLines([...lines, { ...l, amount: "0" }]);
+    if (l.kind !== "cash") setTendered("");
+  };
+  const setAmount = (key: string, v: string) => setLines(lines.map((l) => (l.key === key ? { ...l, amount: v } : l)));
+  const remove = (key: string) => setLines(lines.filter((l) => l.key !== key));
+  // quick cash: exact, then the next round amounts a customer usually hands over (Libyan notes: 1, 5, 10, 20, 50)
+  const quick = useMemo(() => {
+    if (cash <= 0) return [];
+    const ups = [1, 5, 10, 20, 50, 100].map((n) => Math.ceil(cash / n) * n).filter((v) => v > cash);
+    return [...new Set(ups)].slice(0, 4);
+  }, [cash]);
+
   const pay = async () => {
+    if (!ready) return;
     setBusy(true); setErr(null);
     try {
-      const r = await api.post(`/pos/shifts/${shiftId}/sales`, { clientId, customerId: customerId || null, lines: cart.map((l) => ({ itemId: l.itemId, uomId: l.uomId, qty: String(l.qty), discountPct: String(l.discountPct) })),
-        cash: cash.toFixed(3), card: Number(card || 0).toFixed(3), credit: Number(credit || 0).toFixed(3), tendered: cash > 0 ? Number(tendered || 0).toFixed(3) : undefined });
+      const sum = (k: PayLine["kind"]) => r3(lines.filter((l) => l.kind === k).reduce((a, l) => a + (Number(l.amount) || 0), 0)).toFixed(3);
+      const r = await api.post(`/pos/shifts/${shiftId}/sales`, { clientId, customerId: customerId || null,
+        lines: cart.map((l) => ({ itemId: l.itemId, uomId: l.uomId, qty: String(l.qty), discountPct: String(l.discountPct) })),
+        cash: sum("cash"), card: sum("card"), credit: sum("credit"),
+        payments: lines.filter((l) => l.kind === "method" && Number(l.amount) > 0).map((l) => ({ methodId: l.methodId, amount: Number(l.amount).toFixed(3) })),
+        tendered: cash > 0 ? got.toFixed(3) : undefined });
       onDone(r);
-    } catch (e) { setErr(e); toast(errMsg(e, lang), true); } finally { setBusy(false); }
+    } catch (e: any) {
+      // the server prices the sale (customer special prices); if it differs, take its total and let the cashier confirm again
+      if (e?.code === "PAYMENT_MISMATCH" && e.details?.total) {
+        const real = Number(e.details.total); setTotal(real);
+        setLines(lines.length === 1 ? [{ ...lines[0], amount: String(real) }] : lines);
+        toast(tt(`الإجمالي الصحيح ${fmt(String(real))} — راجع الدفع وأكّد`, `Correct total ${real} — check and confirm`), true);
+      } else { setErr(e); toast(errMsg(e, lang), true); }
+    } finally { setBusy(false); }
   };
-  return <Modal title={`${tt("الدفع", "Payment")} — ${fmt(estimate)}`} onClose={onClose} footer={<><button className="btn" onClick={onClose}>{t.cancel}</button>
-    <button className="btn primary" disabled={busy} onClick={pay}>{tt("تأكيد البيع", "Confirm sale")}</button></>}>
+  useEffect(() => { tenderRef.current?.focus(); }, [cashLine?.key]);
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Enter" && !(e.target as HTMLElement)?.closest("select")) { e.preventDefault(); pay(); } };
+    window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
+  });
+
+  const tiles: { l: Omit<PayLine, "amount">; icon: ReactNode; sub?: string }[] = [
+    { l: { key: "cash", kind: "cash", label: tt("نقدًا", "Cash") }, icon: <Banknote size={22} /> },
+    ...methods.map((m) => ({ l: { key: `m:${m.id}`, kind: "method" as const, methodId: m.id, label: m.name_ar }, icon: m.kind === "wallet" ? <Smartphone size={22} /> : m.kind === "transfer" ? <Landmark size={22} /> : <CreditCard size={22} /> })),
+    ...(legacyCard && !methods.length ? [{ l: { key: "card", kind: "card" as const, label: tt("بطاقة", "Card") }, icon: <CreditCard size={22} /> }] : []),
+    ...(canCredit ? [{ l: { key: "credit", kind: "credit" as const, label: tt("آجل على حساب عميل", "On account") }, icon: <UserRound size={22} /> }] : []),
+  ];
+  return <Modal wide title={tt("الدفع", "Payment")} onClose={onClose}
+    footer={<><button className="btn" onClick={onClose}>{t.cancel} <kbd>Esc</kbd></button>
+      <button className="btn primary pay-confirm" disabled={!ready} onClick={pay}>{busy ? "…" : <>{tt("تأكيد البيع", "Confirm sale")} <kbd>Enter</kbd></>}</button></>}>
     <ErrorBox error={err} />
-    <div className="form-grid">
-      <Field label={tt("بطاقة", "Card")}><input className="num" value={card} onChange={(e) => setCard(e.target.value)} /></Field>
-      {can("pos.sales.credit") && <>
-        <Field label={tt("العميل (للآجل)", "Customer (on account)")}><select value={customerId} onChange={(e) => setCustomerId(e.target.value)}><option value="">{tt("عميل نقدي", "Walk-in")}</option>
-          {(customers.data?.data ?? []).map((c: any) => <option key={c.id} value={c.id}>{c.code} · {c.name_ar}</option>)}</select></Field>
-        <Field label={tt("آجل على الحساب", "On account")}><input className="num" value={credit} onChange={(e) => setCredit(e.target.value)} disabled={!customerId} /></Field></>}
-      <Field label={tt("نقدًا", "Cash")}><input className="num" value={cash.toFixed(3)} readOnly /></Field>
-      {cash > 0 && <Field label={tt("المبلغ المستلم", "Tendered")}><input className="num" autoFocus value={tendered} onChange={(e) => setTendered(e.target.value)} /></Field>}
+    <div className="pay-layout">
+      <div className="grid" style={{ gap: 14, alignContent: "start" }}>
+        <div className="pay-total"><span>{tt("المطلوب", "Total due")}</span><b className="num">{fmt(String(total))}</b></div>
+        <div className="pay-tiles">{tiles.map(({ l, icon }) => <button key={l.key} className={`pay-tile ${lines.some((x) => x.key === l.key) ? "on" : ""}`} onClick={() => tap(l)}>{icon}<span>{l.label}</span></button>)}</div>
+        <div className="pay-lines">{lines.map((l) => <div key={l.key} className="pay-line">
+          <span className="pl-name">{l.label}</span>
+          <input className="num" inputMode="decimal" value={l.amount} onFocus={(e) => e.target.select()} onChange={(e) => setAmount(l.key, e.target.value)} aria-label={l.label} />
+          {lines.length > 1 && <button className="btn sm" onClick={() => remove(l.key)} aria-label="remove">✕</button>}
+        </div>)}</div>
+        {creditLine && <Field label={tt("العميل (للآجل)", "Customer (on account)")}><select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+          <option value="">{tt("اختر العميل…", "Choose…")}</option>{customers.data?.data.map((c: any) => <option key={c.id} value={c.id}>{c.code} {c.name_ar}</option>)}</select></Field>}
+      </div>
+      <div className="grid" style={{ gap: 12, alignContent: "start" }}>
+        {cashLine && <>
+          <label className="tender-box"><span>{tt("المبلغ المستلم من الزبون", "Cash received")}</span>
+            <input ref={tenderRef} className="num" inputMode="decimal" placeholder={fmt(String(cash))} value={tendered} onFocus={(e) => e.target.select()} onChange={(e) => setTendered(e.target.value)} /></label>
+          <div className="quick-cash"><button className="btn" onClick={() => setTendered(String(cash))}>{tt("بالضبط", "Exact")} <b className="num">{fmt(String(cash))}</b></button>
+            {quick.map((v) => <button key={v} className="btn" onClick={() => setTendered(String(v))}><b className="num">{v}</b></button>)}</div>
+        </>}
+        <div className={`pay-result ${remaining > 0 ? "due" : change > 0 ? "change" : "ok"}`}>
+          {remaining > 0 ? <><span>{tt("متبقي على الزبون", "Still due")}</span><b className="num">{fmt(String(remaining))}</b></>
+            : remaining < 0 ? <><span>{tt("المدفوع أكثر من المطلوب", "Overpaid")}</span><b className="num">{fmt(String(-remaining))}</b></>
+            : change < 0 ? <><span>{tt("المستلم أقل من النقدي", "Received is short")}</span><b className="num">{fmt(String(-change))}</b></>
+            : change > 0 ? <><span>{tt("الباقي للزبون", "Change to give")}</span><b className="num">{fmt(String(change))}</b></>
+            : <><span>{tt("المبلغ مكتمل", "Fully paid")}</span><Check size={26} /></>}
+        </div>
+      </div>
     </div>
-    {cash > 0 && <div className="row" style={{ fontSize: 20, justifyContent: "space-between" }}><span>{tt("الباقي للعميل", "Change")}</span><b className="num">{fmt(Math.max(0, Number(tendered || 0) - cash))}</b></div>}
   </Modal>;
 }
 
-/** 80 mm thermal receipt: printed with the browser (any printer the device has, incl. Bluetooth/USB receipt printers) */
+/** print format per device: 80 mm thermal roll or an A4 invoice (any office printer) */
+type PrintFormat = "roll" | "a4";
+const getFormat = (): PrintFormat => { try { return (localStorage.getItem("pos.print") as PrintFormat) || "roll"; } catch { return "roll"; } };
+const setFormatStore = (f: PrintFormat) => { try { localStorage.setItem("pos.print", f); } catch { /* per-device convenience only */ } };
+export function printReceipt(format: PrintFormat) {
+  // the page size is set just for this print: no browser margins → no URL/date header and footer
+  const st = document.createElement("style");
+  st.textContent = format === "roll" ? "@page { size: 80mm auto; margin: 0 }" : "@page { size: A4; margin: 0 }";
+  document.head.appendChild(st); document.documentElement.setAttribute("data-print", format);
+  const done = () => { st.remove(); document.documentElement.removeAttribute("data-print"); window.removeEventListener("afterprint", done); };
+  window.addEventListener("afterprint", done);
+  window.print();
+}
+
 export function Receipt({ data, onClose }: { data: any; onClose: () => void }) {
   const { t, tt } = useI18n();
-  const inv = data.invoice;
-  return <Modal title={tt("الإيصال", "Receipt")} onClose={onClose} footer={<><button className="btn" onClick={onClose}>{t.close}</button><button className="btn primary" onClick={() => window.print()}>{tt("طباعة", "Print")}</button></>}>
-    <div className="receipt" id="receipt">
-      <div style={{ textAlign: "center" }}><b>{data.company_name}</b>{data.receipt_header && <div>{data.receipt_header}</div>}
-        <div>{data.register_name} · {tt("الكاشير", "Cashier")}: {data.cashier}</div><div className="num">{inv.number} · {fmtDateTime(inv.posted_at)}</div>
-        {data.customer_code !== "WALKIN" && <div>{data.customer_name}</div>}</div>
-      <hr />
-      {inv.lines.map((l: any) => <div key={l.id} className="row" style={{ justifyContent: "space-between" }}><span>{l.item_name_ar ?? l.item_code} × {Number(l.qty)} {l.uom_code ?? ""}{Number(l.discount_pct) ? ` (-${Number(l.discount_pct)}%)` : ""}</span><span className="num">{fmt(l.line_total)}</span></div>)}
-      <hr />
-      {Number(inv.discount_total) > 0 && <div className="row" style={{ justifyContent: "space-between" }}><span>{tt("الخصم", "Discount")}</span><span className="num">-{fmt(inv.discount_total)}</span></div>}
-      <div className="row" style={{ justifyContent: "space-between", fontSize: 18 }}><b>{t.total}</b><b className="num">{fmt(inv.total)}</b></div>
-      {data.payments.map((p: any, i: number) => <div key={i} className="row" style={{ justifyContent: "space-between" }}><span>{({ cash: tt("نقدًا", "Cash"), card: tt("بطاقة", "Card"), credit: tt("آجل", "On account") } as any)[p.tender]}</span><span className="num">{fmt(p.amount)}</span></div>)}
-      {data.tendered && <div className="row" style={{ justifyContent: "space-between" }}><span>{tt("المستلم / الباقي", "Tendered / change")}</span><span className="num">{fmt(data.tendered)} / {fmt(data.change)}</span></div>}
-      {data.receipt_footer && <><hr /><div style={{ textAlign: "center" }}>{data.receipt_footer}</div></>}
-    </div>
+  const [format, setFormat] = useState<PrintFormat>(getFormat);
+  const choose = (f: PrintFormat) => { setFormat(f); setFormatStore(f); };
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); onClose(); } };
+    window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
+  }, [onClose]);
+  return <Modal title={tt("تم البيع ✓", "Sale complete ✓")} onClose={onClose} footer={<>
+    <div className="seg" style={{ marginInlineEnd: "auto" }}><button className={format === "roll" ? "on" : ""} onClick={() => choose("roll")}>{tt("إيصال حراري 80مم", "80mm receipt")}</button>
+      <button className={format === "a4" ? "on" : ""} onClick={() => choose("a4")}>{tt("فاتورة A4", "A4 invoice")}</button></div>
+    <button className="btn" onClick={() => printReceipt(format)}><Printer size={16} />{tt("طباعة", "Print")}</button>
+    <button className="btn primary" onClick={onClose}>{tt("بيع جديد", "New sale")} <kbd>Enter</kbd></button></>}>
+    {Number(data.change) > 0 && <div className="pay-result change" style={{ marginBottom: 12 }}><span>{tt("الباقي للزبون", "Change to give")}</span><b className="num">{fmt(data.change)}</b></div>}
+    <div className={`receipt-paper ${format}`}><ReceiptBody data={data} format={format} /></div>
+    {createPortal(<div className="print-portal"><div className={`receipt-print ${format}`}><ReceiptBody data={data} format={format} /></div></div>, document.body)}
   </Modal>;
+}
+
+function ReceiptBody({ data, format }: { data: any; format: PrintFormat }) {
+  const { tt } = useI18n();
+  const inv = data.invoice;
+  const tender = (p: any) => p.method ?? ({ cash: tt("نقدًا", "Cash"), card: tt("بطاقة", "Card"), credit: tt("آجل", "On account") } as any)[p.tender];
+  const row = (label: ReactNode, value: ReactNode, cls = "") => <div className={`rc-row ${cls}`}><span>{label}</span><span className="num">{value}</span></div>;
+  return <div className="rc">
+    <div className="rc-head">
+      <b className="rc-company">{data.company_name}</b>
+      {data.receipt_header && <div>{data.receipt_header}</div>}
+      <div className="rc-title">{format === "a4" ? tt("فاتورة مبيعات", "Sales invoice") : tt("إيصال بيع", "Sales receipt")}</div>
+    </div>
+    <div className="rc-meta">
+      {row(tt("رقم الفاتورة", "Invoice no."), inv.number)}
+      {row(tt("التاريخ", "Date"), fmtDateTime(inv.posted_at))}
+      {row(tt("الكاشير", "Cashier"), <span style={{ fontFamily: "inherit" }}>{data.cashier}</span>)}
+      {data.customer_code !== "WALKIN" && row(tt("العميل", "Customer"), <span style={{ fontFamily: "inherit" }}>{data.customer_name}</span>)}
+    </div>
+    <table className="rc-items"><thead><tr><th>{tt("الصنف", "Item")}</th><th className="end">{tt("الكمية", "Qty")}</th>{format === "a4" && <th className="end">{tt("السعر", "Price")}</th>}<th className="end">{tt("المبلغ", "Amount")}</th></tr></thead>
+      <tbody>{inv.lines.map((l: any) => <tr key={l.id}><td>{l.item_name_ar ?? l.item_code}{Number(l.discount_pct) ? <small> −{Number(l.discount_pct)}%</small> : null}</td>
+        <td className="end num">{Number(l.qty)} {l.uom_code ?? ""}</td>{format === "a4" && <td className="end num">{fmt(l.unit_price)}</td>}<td className="end num">{fmt(l.line_total)}</td></tr>)}</tbody></table>
+    <div className="rc-totals">
+      {Number(inv.discount_total) > 0 && row(tt("الخصم", "Discount"), `−${fmt(inv.discount_total)}`)}
+      {row(tt("الإجمالي", "Total"), fmt(inv.total), "rc-grand")}
+      {data.payments.map((p: any, i: number) => <div key={i}>{row(tender(p), fmt(p.amount))}</div>)}
+      {data.tendered && <>{row(tt("المستلم", "Received"), fmt(data.tendered))}{row(tt("الباقي", "Change"), fmt(data.change), "rc-change")}</>}
+    </div>
+    <div className="rc-foot">{data.receipt_footer || tt("شكرًا لزيارتكم", "Thank you")}<div className="num" style={{ fontSize: "0.85em", opacity: 0.7 }}>{data.register_name} · {data.shift_number}</div></div>
+  </div>;
 }
 
 function CloseShift({ report, onClose, onDone }: { report: any; onClose: () => void; onDone: () => void }) {
@@ -314,4 +441,51 @@ function Registers({ onClose }: { onClose: () => void }) {
       <Field label={tt("تذييل الإيصال", "Receipt footer")}><input value={f.receiptFooter} onChange={(e) => setF({ ...f, receiptFooter: e.target.value })} /></Field>
     </div>
   </Modal>;
+}
+
+// ================================================================== payment methods (settings)
+/** card / wallet / transfer methods: each settles to its own account; optionally limited to named cashiers */
+export function PaymentMethods() {
+  const { tt, lang } = useI18n();
+  const { companyId, can } = useSession();
+  const { toast } = useToast();
+  const list = useAsync(() => api.get(`/pos/payment-methods?companyId=${companyId}`), [companyId]);
+  const accounts = useAsync(() => api.get(`/accounting/accounts?companyId=${companyId}`), [companyId]);
+  const users = useAsync(() => (can("core.users.view") ? api.get("/users?pageSize=200&active=true") : Promise.resolve({ data: [] })), []);
+  const blank = { id: "", nameAr: "", kind: "card", accountId: "", isActive: true, userIds: [] as string[] };
+  const [f, setF] = useState<typeof blank | null>(null);
+  const assets = (accounts.data ?? []).filter((a: any) => a.type === "asset" && a.is_postable !== false && !["ar", "ap"].includes(a.role));
+  const save = async () => {
+    if (!f) return;
+    const body = { companyId, nameAr: f.nameAr, kind: f.kind, accountId: f.accountId, isActive: f.isActive, userIds: f.userIds };
+    try { if (f.id) await api.put(`/pos/payment-methods/${f.id}`, body); else await api.post("/pos/payment-methods", body); toast(tt("حُفظت طريقة الدفع", "Saved")); setF(null); list.reload(); }
+    catch (e) { toast(errMsg(e, lang), true); }
+  };
+  const kindName = (k: string) => ({ card: tt("بطاقة مصرفية", "Bank card"), wallet: tt("محفظة إلكترونية", "E-wallet"), transfer: tt("تحويل مصرفي", "Bank transfer") } as any)[k];
+  return <div className="card">
+    <div className="row"><h2 style={{ margin: 0 }}>{tt("طرق الدفع (البطاقات والمحافظ)", "Payment methods (cards & wallets)")}</h2><span className="spacer" />
+      <button className="btn primary" onClick={() => setF(blank)}>{tt("+ طريقة دفع", "+ Method")}</button></div>
+    <p style={{ color: "var(--muted)" }}>{tt("كل طريقة تظهر للكاشير زرًا في شاشة الدفع، وتُرحَّل لحسابها. إن حددت مستخدمين فلن تظهر إلا لهم.", "Each method is a button on the payment screen and posts to its own account. Pick users to limit who sees it.")}</p>
+    <ErrorBox error={list.error} />
+    <div className="table-wrap"><table><thead><tr><th>{tt("الاسم", "Name")}</th><th>{tt("النوع", "Kind")}</th><th>{tt("الحساب", "Account")}</th><th>{tt("متاحة لـ", "Available to")}</th><th>{tt("الحالة", "Status")}</th><th /></tr></thead>
+      <tbody>{(list.data ?? []).length ? list.data.map((m: any) => <tr key={m.id}><td><b>{m.name_ar}</b></td><td>{kindName(m.kind)}</td><td><span className="num">{m.account_code}</span> {m.account_name}</td>
+        <td>{m.user_ids.length ? tt(`${m.user_ids.length} مستخدم`, `${m.user_ids.length} users`) : tt("كل الكاشيرية", "All cashiers")}</td>
+        <td>{m.is_active ? <span className="badge ok">{tt("فعّالة", "Active")}</span> : <span className="badge">{tt("موقوفة", "Inactive")}</span>}</td>
+        <td><button className="btn sm" onClick={() => setF({ id: m.id, nameAr: m.name_ar, kind: m.kind, accountId: m.account_id, isActive: m.is_active, userIds: m.user_ids })}>{tt("تعديل", "Edit")}</button></td></tr>)
+        : <tr><td colSpan={6} style={{ color: "var(--muted)" }}>{tt("لا توجد طرق دفع بعد — أضف مثلًا «بطاقة مصرف الجمهورية» و«موبي كاش».", "None yet — add e.g. a bank card and a mobile wallet.")}</td></tr>}</tbody></table></div>
+    {f && <Modal title={f.id ? tt("تعديل طريقة الدفع", "Edit method") : tt("طريقة دفع جديدة", "New payment method")} onClose={() => setF(null)}
+      footer={<><button className="btn" onClick={() => setF(null)}>{tt("إلغاء", "Cancel")}</button><button className="btn primary" disabled={!f.nameAr || !f.accountId} onClick={save}>{tt("حفظ", "Save")}</button></>}>
+      <div className="form-grid">
+        <Field label={tt("الاسم كما يراه الكاشير", "Name shown to the cashier")}><input value={f.nameAr} onChange={(e) => setF({ ...f, nameAr: e.target.value })} placeholder={tt("مثال: بطاقة مصرف الجمهورية", "e.g. Bank card")} /></Field>
+        <Field label={tt("النوع", "Kind")}><select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>{["card", "wallet", "transfer"].map((k) => <option key={k} value={k}>{kindName(k)}</option>)}</select></Field>
+        <Field label={tt("الحساب الذي يُرحَّل له", "Account it posts to")}><select value={f.accountId} onChange={(e) => setF({ ...f, accountId: e.target.value })}><option value="">—</option>
+          {assets.map((a: any) => <option key={a.id} value={a.id}>{a.code} — {a.name_ar}</option>)}</select></Field>
+        <label className="setting-row" style={{ border: 0 }}><span><b>{tt("فعّالة", "Active")}</b></span><input type="checkbox" className="toggle" checked={f.isActive} onChange={(e) => setF({ ...f, isActive: e.target.checked })} /></label>
+      </div>
+      <h3>{tt("متاحة لـ (اتركها فارغة = كل الكاشيرية)", "Available to (empty = all cashiers)")}</h3>
+      <div className="mod-groups">{(users.data?.data ?? []).map((u: any) => <label key={u.id} className={`mod-item ${f.userIds.includes(u.id) ? "on" : ""}`}>
+        <input type="checkbox" style={{ width: "auto", minHeight: 0 }} checked={f.userIds.includes(u.id)} onChange={() => setF({ ...f, userIds: f.userIds.includes(u.id) ? f.userIds.filter((x) => x !== u.id) : [...f.userIds, u.id] })} />
+        <span>{u.full_name}</span><small>{u.email}</small></label>)}</div>
+    </Modal>}
+  </div>;
 }

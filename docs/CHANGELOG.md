@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0 — unreleased — feedback from the first trial
+### Added
+- **POS payment screen**: one tap per method (cash, each card / wallet / transfer the cashier may use, on account), split payments, a large "received" box with exact / round-note buttons, live change or still-due, Enter to confirm, F9 to pay, quantity +/− in the cart; when the server's price differs (customer special price) the screen takes the server total and asks to confirm again.
+- **Payment methods** (migration 017): several card / wallet / transfer methods per company, each posting to its own account, optionally limited to named cashiers; Z report splits card takings by method; receipts name the method.
+- **Receipt**: new design; choose 80 mm roll or A4 invoice per device; prints alone at the top of the page with no browser header/footer.
+- **Settings page**, **colour themes** with a calm charcoal dark mode, **roles editor** (copy & edit), **plan designer** with module dependency rules, **plan comparison** for customers.
+- `tools/loadtest/pos-rush.mjs` — POS rush-hour load test with correctness checks.
+### Fixed
+- Receipt showed "received / change" with the two numbers in reversed order.
+- Creating a role did not check that the creator holds the permissions granted (editing did).
+
 ## 0.8.0 — 2026-11-22 — first full trial version
 ### Added
 - **Quotations → sales orders → invoices** (migration 016): credit-limit check on confirmation (open receivables + open credit orders), stock reservation by available-to-promise (sellable, not expired, not on QC hold, minus other confirmed orders; serialized per warehouse), explicit backorders, partial invoicing linked to order lines, no over-delivery (DB constraint), close/cancel releases the reservation.

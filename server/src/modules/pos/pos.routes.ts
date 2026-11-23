@@ -45,6 +45,21 @@ export async function posRoutes(app: FastifyInstance) {
   });
 
   // ---------------------------------------------------------------- shifts
+  app.get("/pos/payment-methods", { schema: { ...P, summary: "Card / wallet / transfer methods with their accounts and allowed cashiers" }, preHandler: can("pos.registers.manage") }, async (req) => {
+    const q = parse(z.object({ companyId: zUuid }), req.query);
+    return tdb(req, (db) => pos.paymentMethods(db, q.companyId));
+  });
+  const zMethod = z.object({ companyId: zUuid, nameAr: z.string().min(2).max(60), kind: z.enum(["card", "wallet", "transfer"]).default("card"), accountId: zUuid,
+    sortOrder: z.number().int().min(0).max(999).default(0), isActive: z.boolean().default(true), userIds: z.array(zUuid).max(500).default([]) });
+  app.post("/pos/payment-methods", { schema: { ...P, summary: "Add a payment method (empty userIds = every cashier)" }, preHandler: can("pos.registers.manage") }, async (req, reply) => {
+    const b = parse(zMethod, req.body);
+    return reply.code(201).send(await tdb(req, (db) => pos.savePaymentMethod(db, req.user!, b)));
+  });
+  app.put("/pos/payment-methods/:id", { schema: { ...P, summary: "Edit a payment method" }, preHandler: can("pos.registers.manage") }, async (req) => {
+    const { id } = parse(id$, req.params);
+    const b = parse(zMethod, req.body);
+    return tdb(req, (db) => pos.savePaymentMethod(db, req.user!, { ...b, id }));
+  });
   app.get("/pos/shifts", { schema: { ...P, summary: "Shifts (cashiers see their own; supervisors all)" }, preHandler: can("pos.shifts.operate") }, async (req) => {
     const q = parse(z.object({ companyId: zUuid, status: z.enum(["open", "closed"]).optional() }), req.query);
     const all = req.user!.permissions.has("pos.shifts.supervise");
@@ -58,8 +73,11 @@ export async function posRoutes(app: FastifyInstance) {
   });
   app.get("/pos/shifts/current", { schema: { ...P, summary: "My open shift (or null)" }, preHandler: can("pos.shifts.operate") }, async (req) => {
     return tdb(req, async (db) => {
-      const s = (await db.query("SELECT id FROM pos_shifts WHERE cashier_id = $1 AND status = 'open'", [req.user!.userId])).rows[0];
-      return s ? pos.shiftReport(db, s.id) : null;
+      const s = (await db.query("SELECT s.id, s.company_id, r.card_account_id FROM pos_shifts s JOIN pos_registers r ON r.id = s.register_id WHERE s.cashier_id = $1 AND s.status = 'open'", [req.user!.userId])).rows[0];
+      if (!s) return null;
+      // the payment screen offers exactly what this cashier may take
+      return { ...(await pos.shiftReport(db, s.id)), paymentMethods: (await pos.paymentMethods(db, s.company_id, req.user!.userId)).map((m: any) => ({ id: m.id, name_ar: m.name_ar, kind: m.kind })),
+        legacyCard: !!s.card_account_id };
     });
   });
   app.post("/pos/shifts", { schema: { ...P, summary: "Open my shift (opening float moved from the safe to the drawer)" }, preHandler: can("pos.shifts.operate") }, async (req, reply) => {
@@ -79,7 +97,8 @@ export async function posRoutes(app: FastifyInstance) {
     const b = parse(z.object({ clientId: z.string().min(8).max(100), customerId: zUuid.nullable().optional(), notes: z.string().max(500).optional(),
       lines: z.array(z.object({ itemId: zUuid.optional(), barcode: z.string().min(1).max(64).optional(), uomId: zUuid.nullable().optional(), qty: zQty, discountPct: zPct.optional() })
         .refine((l) => !!l.itemId !== !!l.barcode, "itemId or barcode")).min(1).max(200),
-      cash: zMoney.default("0"), card: zMoney.default("0"), credit: zMoney.default("0"), tendered: zMoney.optional() }), req.body);
+      cash: zMoney.default("0"), card: zMoney.default("0"), credit: zMoney.default("0"), tendered: zMoney.optional(),
+      payments: z.array(z.object({ methodId: zUuid, amount: zMoney })).max(10).optional() }), req.body);
     const r = await tdb(req, (db) => pos.sell(db, req.user!, id, b));
     return reply.code(r.replayed ? 200 : 201).send(r);
   });

@@ -85,6 +85,37 @@ export interface SaleInput {
   clientId: string; customerId?: string | null; notes?: string;
   lines: { itemId?: string; barcode?: string; uomId?: string | null; qty: string; discountPct?: string }[];
   cash: string; card: string; credit: string; tendered?: string;
+  /** card / wallet / transfer methods (each settles to its own account); `card` above is the register's single legacy card account */
+  payments?: { methodId: string; amount: string }[];
+}
+
+// ------------------------------------------------------------------ payment methods
+/** active methods of a company; with `forUser`, only those that user may take (no user list = everyone) */
+export async function paymentMethods(db: Db, companyId: string, forUser?: string) {
+  return (await db.query(
+    `SELECT m.*, a.code AS account_code, a.name_ar AS account_name,
+            ARRAY(SELECT user_id FROM pos_payment_method_users mu WHERE mu.method_id = m.id) AS user_ids
+       FROM pos_payment_methods m JOIN accounts a ON a.id = m.account_id
+      WHERE m.company_id = $1 AND ($2::uuid IS NULL OR (m.is_active AND (NOT EXISTS (SELECT 1 FROM pos_payment_method_users mu WHERE mu.method_id = m.id)
+                                                                        OR EXISTS (SELECT 1 FROM pos_payment_method_users mu WHERE mu.method_id = m.id AND mu.user_id = $2))))
+      ORDER BY m.is_active DESC, m.sort_order, m.name_ar`, [companyId, forUser ?? null])).rows;
+}
+export async function savePaymentMethod(db: Db, u: UserCtx, b: { id?: string; companyId: string; nameAr: string; kind: "card" | "wallet" | "transfer"; accountId: string;
+  sortOrder?: number; isActive?: boolean; userIds?: string[] }) {
+  await postableAccount(db, b.companyId, b.accountId, "accountId", ["asset"], { noControl: true });
+  let id = b.id;
+  if (id) {
+    const r = await db.query("UPDATE pos_payment_methods SET name_ar = $2, kind = $3, account_id = $4, sort_order = $5, is_active = $6 WHERE id = $1 AND company_id = $7 RETURNING id",
+      [id, b.nameAr, b.kind, b.accountId, b.sortOrder ?? 0, b.isActive ?? true, b.companyId]);
+    if (!r.rowCount) throw E.notFound("pos_payment_methods");
+    await db.query("DELETE FROM pos_payment_method_users WHERE method_id = $1", [id]);
+  } else {
+    id = (await db.query("INSERT INTO pos_payment_methods (tenant_id, company_id, name_ar, kind, account_id, sort_order, is_active) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id",
+      [u.tenantId, b.companyId, b.nameAr, b.kind, b.accountId, b.sortOrder ?? 0, b.isActive ?? true])).rows[0].id as string;
+  }
+  if (b.userIds?.length) await db.query("INSERT INTO pos_payment_method_users (tenant_id, method_id, user_id) SELECT $1, $2, unnest($3::uuid[])", [u.tenantId, id, b.userIds]);
+  await ev(db, u, b.id ? "pos_method.updated" : "pos_method.created", "pos_payment_method", id!, b);
+  return (await paymentMethods(db, b.companyId)).find((m: any) => m.id === id);
 }
 
 async function resolveLine(db: Db, companyId: string, l: SaleInput["lines"][number]) {
@@ -108,6 +139,11 @@ export async function sell(db: Db, u: UserCtx, shiftId: string, b: SaleInput) {
     if (customerId === s.walk_in_customer_id) throw E.rule("CREDIT_NEEDS_CUSTOMER", "البيع الآجل يتطلب اختيار عميل مسجّل", "Selling on account requires a registered customer");
   }
   if (Number(b.card) > 0 && !s.card_account_id) throw E.rule("CARD_NOT_CONFIGURED", "لم يُحدد حساب البطاقات لنقطة البيع", "No card account is configured for this register");
+  const allowed = new Map((await paymentMethods(db, s.company_id, u.userId)).map((m: any) => [m.id, m]));
+  const methodPays = (b.payments ?? []).filter((p) => Number(p.amount) > 0);
+  for (const p of methodPays) if (!allowed.has(p.methodId))
+    throw E.rule("PAYMENT_METHOD_NOT_ALLOWED", "طريقة الدفع غير متاحة لك أو موقوفة", "This payment method is not available to you or is inactive", { methodId: p.methodId });
+  const methodTotal = methodPays.reduce((a, p) => a + Number(p.amount), 0).toFixed(4);
   const lines = [];
   for (const l of b.lines) {
     const disc = l.discountPct ?? "0";
@@ -118,14 +154,17 @@ export async function sell(db: Db, u: UserCtx, shiftId: string, b: SaleInput) {
   const ctx = posCtx(u);
   const draft = await createInvoice(db, ctx, { companyId: s.company_id, branchId: s.branch_id, warehouseId: s.warehouse_id, customerId, invoiceDate: String(s.business_date).slice(0, 10),
     paymentType: Number(b.credit) > 0 ? "credit" : "cash", notes: b.notes, posShiftId: shiftId, posClientId: b.clientId, lines });
-  const sum = (await num(db, "SELECT ($1::numeric + $2::numeric + $3::numeric)::text AS s, ($1::numeric + $2::numeric + $3::numeric) = $4::numeric AS ok", [b.cash, b.card, b.credit, draft.total]));
+  const sum = (await num(db, "SELECT ($1::numeric + $2::numeric + $3::numeric + $5::numeric)::text AS s, ($1::numeric + $2::numeric + $3::numeric + $5::numeric) = $4::numeric AS ok", [b.cash, b.card, b.credit, draft.total, methodTotal]));
   if (!sum.ok) throw E.rule("PAYMENT_MISMATCH", `مجموع الدفع ${sum.s} لا يساوي إجمالي الفاتورة ${draft.total}`, `Payments ${sum.s} do not equal the invoice total ${draft.total}`, { total: draft.total });
   if (b.tendered !== undefined && Number(b.tendered) < Number(b.cash)) throw E.validation([{ path: "tendered", message: "less than the cash part" }]);
-  const settlement = [{ accountId: s.cash_account_id, amount: b.cash }, ...(Number(b.card) > 0 ? [{ accountId: s.card_account_id, amount: b.card }] : [])].filter((x) => Number(x.amount) > 0);
+  const settlement = [{ accountId: s.cash_account_id, amount: b.cash }, ...(Number(b.card) > 0 ? [{ accountId: s.card_account_id, amount: b.card }] : []),
+    ...methodPays.map((p) => ({ accountId: (allowed.get(p.methodId) as any).account_id as string, amount: p.amount }))].filter((x) => Number(x.amount) > 0);
   await postInvoice(db, ctx, draft.id, { settlement });
   for (const [tender, amount] of [["cash", b.cash], ["card", b.card], ["credit", b.credit]] as const)
     if (Number(amount) > 0) await db.query("INSERT INTO pos_payments (tenant_id, shift_id, kind, tender, amount, invoice_id, created_by) VALUES ($1,$2,'sale',$3,$4,$5,$6)",
       [u.tenantId, shiftId, tender, amount, draft.id, u.userId]);
+  for (const p of methodPays) await db.query("INSERT INTO pos_payments (tenant_id, shift_id, kind, tender, amount, invoice_id, created_by, method_id) VALUES ($1,$2,'sale','card',$3,$4,$5,$6)",
+    [u.tenantId, shiftId, p.amount, draft.id, u.userId, p.methodId]);
   const change = b.tendered !== undefined ? (await num(db, "SELECT ($1::numeric - $2::numeric)::numeric(20,4)::text AS c", [b.tendered, b.cash])).c : "0.0000";
   return { ...(await receipt(db, draft.id)), tendered: b.tendered ?? null, change, replayed: false };
 }
@@ -138,7 +177,7 @@ export async function receipt(db: Db, invoiceId: string) {
             p.code AS customer_code, p.name_ar AS customer_name
        FROM pos_shifts s JOIN pos_registers r ON r.id = s.register_id JOIN users u ON u.id = s.cashier_id JOIN companies c ON c.id = s.company_id
        JOIN sales_invoices i ON i.id = $2 JOIN parties p ON p.id = i.customer_id WHERE s.id = $1`, [inv.pos_shift_id, invoiceId])).rows[0];
-  const payments = (await db.query("SELECT kind, tender, amount FROM pos_payments WHERE invoice_id = $1 ORDER BY id", [invoiceId])).rows;
+  const payments = (await db.query("SELECT p.kind, p.tender, p.amount, m.name_ar AS method FROM pos_payments p LEFT JOIN pos_payment_methods m ON m.id = p.method_id WHERE p.invoice_id = $1 ORDER BY p.id", [invoiceId])).rows;
   return { invoice: inv, ...meta, payments };
 }
 
@@ -207,9 +246,13 @@ export async function shiftReport(db: Db, shiftId: string) {
        FROM sales_invoices WHERE pos_shift_id = $1 AND status = 'posted'`, [shiftId])).rows[0];
   const byTender = (await db.query(
     `SELECT kind, tender, count(*)::int AS n, sum(amount)::numeric(20,4)::text AS amount FROM pos_payments WHERE shift_id = $1 GROUP BY kind, tender ORDER BY kind, tender`, [shiftId])).rows;
+  // card / wallet / transfer split by method, to check against each bank's settlement
+  const byMethod = (await db.query(
+    `SELECT coalesce(m.name_ar, 'بطاقة') AS method, count(*)::int AS n, sum(p.amount)::numeric(20,4)::text AS amount FROM pos_payments p LEFT JOIN pos_payment_methods m ON m.id = p.method_id
+      WHERE p.shift_id = $1 AND p.tender = 'card' GROUP BY 1 ORDER BY 1`, [shiftId])).rows;
   const topItems = (await db.query(
     `SELECT it.code, it.name_ar, sum(l.base_qty)::numeric(20,4)::text AS qty, sum(l.line_total)::numeric(20,4)::text AS amount
        FROM sales_invoice_lines l JOIN sales_invoices i ON i.id = l.doc_id JOIN items it ON it.id = l.item_id
       WHERE i.pos_shift_id = $1 AND i.status = 'posted' GROUP BY it.id ORDER BY sum(l.line_total) DESC LIMIT 10`, [shiftId])).rows;
-  return { shift: s, totals: t, byTender, topItems, expectedCash: s.status === "open" ? await expectedCash(db, shiftId) : s.expected_cash };
+  return { shift: s, totals: t, byTender, byMethod, topItems, expectedCash: s.status === "open" ? await expectedCash(db, shiftId) : s.expected_cash };
 }

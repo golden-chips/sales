@@ -8,6 +8,7 @@ import { useI18n } from "../i18n";
 import { useSession } from "../session";
 import { ErrorBox, Field, Loading, errMsg, useAsync, useToast } from "../ui";
 import { setAppearance, useAppearance } from "../shell";
+import { PaymentMethods } from "./pos/Pos";
 
 type Tt = (ar: string, en: string) => string;
 const ACCENTS: [string, string, string, string][] = [   // code, ar, en, swatch
@@ -44,7 +45,7 @@ export default function Settings() {
           ["/go-live", "جاهزية التشغيل", "Go-live readiness", "core.golive.view"], ["/audit", "سجل التدقيق", "Audit log", "core.audit.view"]]} />}
         {tab.key === "accounting" && <AccountingPane />}
         {tab.key === "orders" && <OrdersPane />}
-        {tab.key === "pos" && <PosPane />}
+        {tab.key === "pos" && <><PosPane />{can("pos.registers.manage") && <PaymentMethods />}</>}
         {tab.key === "hr" && <HrPane />}
         {tab.key === "more" && <LinksPane links={[["/manufacturing/boms", "التصنيع: الوصفات وخطوط الإنتاج", "Manufacturing: formulas & lines", "manufacturing.boms.view"],
           ["/quality/specs", "الجودة: المواصفات و HACCP", "Quality: specs & HACCP", "quality.view"], ["/assets", "الأصول: فئات الأصول وحسابات الإهلاك", "Assets: categories & depreciation accounts", "assets.register.view"],

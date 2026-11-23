@@ -73,10 +73,13 @@ test("point of sale: cashier sells from the open shift and closes it (Z report)"
   const card = page.locator(".card", { hasText: "DEMO-CHIPS-40" }).first();
   await card.click();
   await card.click();
-  await page.getByRole("button", { name: "الدفع", exact: true }).click();
-  await modal(page).getByRole("button", { name: "تأكيد البيع" }).click();
-  await expect(modal(page).getByText("الإيصال").first()).toBeVisible();
-  await modal(page).locator(".btn").first().click();
+  await page.getByRole("button", { name: /^الدفع/ }).click();
+  await modal(page).getByRole("button", { name: /^بالضبط/ }).click();   // cash, exact amount
+  await expect(modal(page).locator(".pay-result")).toContainText("المبلغ مكتمل");
+  await modal(page).getByRole("button", { name: /تأكيد البيع/ }).click();
+  await expect(modal(page).getByText("تم البيع").first()).toBeVisible();
+  await expect(modal(page).locator(".receipt-paper")).toContainText("الإجمالي");
+  await modal(page).getByRole("button", { name: /بيع جديد/ }).click();
   await page.getByRole("button", { name: "إقفال الوردية" }).click();
   await modal(page).locator("input").first().fill("0");
   await modal(page).getByRole("button", { name: "إقفال", exact: true }).click();
