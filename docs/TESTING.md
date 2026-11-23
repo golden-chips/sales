@@ -131,7 +131,10 @@ CI job `e2e` on a fresh database; failures upload the HTML report, screenshots a
   empty, no red error box); then each of the 12 DEMO roles opens every screen in its own menu.
 * `02-flows`: invoice drafted by sales and posted by the GM; quotation → order → confirm (stock
   reserved) → draft invoice; finance approves a PO above the threshold; cashier sells and closes the
-  shift (Z report); production/quality, payroll, field-rep route, trial balance and BI screens.
+  shift (Z report); POS offline sale sent when the connection returns; production/quality, payroll,
+  field-rep route, trial balance and BI screens.
+* `03-session`: the refresh token is in an httpOnly cookie (not readable by page scripts); a reload
+  and a new tab stay signed in; signing out ends the session.
 
 The flows change data (e.g. the POS shift is closed), so run them on a throw-away copy:
 ```bash

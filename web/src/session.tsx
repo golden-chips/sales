@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, ApiError, getSession, setSession } from "./api";
+import { api, ApiError, getSession, hasCookieSession, refresh, setSession } from "./api";
 
 export interface Me {
   user: { id: string; email: string | null; username: string | null; full_name: string; locale: string; is_owner: boolean; mfa_enabled: boolean };
@@ -8,13 +8,15 @@ export interface Me {
   roles: { code: string; name_ar: string; name_en: string; branch_id: string | null }[];
   permissions: string[]; modules: string[];
 }
-const Ctx = createContext<{ me: Me | null; loading: boolean; companyId: string | null; setCompanyId: (id: string) => void; can: (p: string) => boolean; signIn: (s: { accessToken: string; refreshToken: string }) => Promise<void>; signOut: () => void }>(null as any);
+const Ctx = createContext<{ me: Me | null; loading: boolean; companyId: string | null; setCompanyId: (id: string) => void; can: (p: string) => boolean; signIn: (s: { accessToken: string; refreshToken?: string; cookieSession?: boolean }) => Promise<void>; signOut: () => void }>(null as any);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
-  const [loading, setLoading] = useState(!!getSession("tenant"));
+  const [loading, setLoading] = useState(!!getSession("tenant") || hasCookieSession());
   const [companyId, setCompanyIdState] = useState<string | null>(() => { try { return localStorage.getItem("ge.company"); } catch { return null; } });
   const load = async () => {
+    // a new tab of a browser that is already signed in: get this tab's access token from the cookie session
+    if (!getSession("tenant") && hasCookieSession()) await refresh().catch(() => false);
     if (!getSession("tenant")) { setMe(null); setLoading(false); return; }
     const apply = (m: Me) => {
       setMe(m);
@@ -47,7 +49,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       me, loading, companyId, setCompanyId, can: (p) => !!me?.permissions.includes(p),
-      signIn: async (s) => { setSession("tenant", s); setLoading(true); await load(); },
+      signIn: async (s) => { setSession("tenant", s.refreshToken ? { accessToken: s.accessToken, refreshToken: s.refreshToken } : { accessToken: s.accessToken, cookie: true }); setLoading(true); await load(); },
       signOut: () => { try { localStorage.removeItem("ge.me"); } catch { /* nothing cached */ } api.post("/auth/logout").catch(() => undefined).finally(() => { setSession("tenant", null); setMe(null); }); },
     }}>{children}</Ctx.Provider>
   );

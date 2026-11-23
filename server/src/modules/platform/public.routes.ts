@@ -1,5 +1,6 @@
 // Public (unauthenticated) endpoints: pricing and self-service trial signup.
 import type { FastifyInstance } from "fastify";
+import { deliverTokens } from "../auth/auth.routes.js";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { withAnonymous, withPlatform, withPlatformInTenant } from "../../db/pool.js";
@@ -47,6 +48,6 @@ export async function publicRoutes(app: FastifyInstance) {
         [id, out.ownerUserId, sha256(refresh), randomUUID(), config.refreshTokenTtlSec, req.ip, req.headers["user-agent"] ?? null]);
       return out;
     }).catch((e) => { if (e?.code === "23505" && String(e.constraint ?? "").includes("tenants_code")) throw E.conflict("رمز الشركة مستخدم — اختر رمزًا آخر", "Company code is taken"); throw e; });
-    return reply.code(201).send({ tenantCode: b.code, trialDays: plan.trial_days, accessToken: signAccess(r.ownerUserId, id), refreshToken: `${id}.${refresh}` });
+    return reply.code(201).send(deliverTokens(req, reply, { tenantCode: b.code, trialDays: plan.trial_days, accessToken: signAccess(r.ownerUserId, id), refreshToken: `${id}.${refresh}` }));
   });
 }

@@ -28,7 +28,7 @@ export default function Signup() {
       const r = await api.post("/public/signup", f);
       try { localStorage.setItem("ge.tenant", r.tenantCode); } catch { /* not persisted */ }
       history.replaceState(null, "", "/");
-      await signIn({ accessToken: r.accessToken, refreshToken: r.refreshToken });
+      await signIn(r);
     } catch (x) { setErr(x); } finally { setBusy(false); }
   };
   const s = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });

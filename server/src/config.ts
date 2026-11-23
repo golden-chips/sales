@@ -28,6 +28,16 @@ export const config = {
   /** per signed-in session (users behind one office IP each get their own budget) */
   userRateLimitPerMin: num("USER_RATE_LIMIT_PER_MIN", 600),
   logLevel: process.env.LOG_LEVEL ?? "info",
+  /** key for secrets stored in the database (MFA). If unset it is derived from JWT_SECRET — set it in production */
+  dataEncryptionKey: process.env.DATA_ENCRYPTION_KEY ?? "",
+  /** "off" disables the per-company request budget (plan api_rpm) — e.g. for a load test */
+  tenantRateLimit: (process.env.TENANT_RATE_LIMIT ?? "on") !== "off",
+  /** Secure flag on the refresh cookie: "auto" (default) = when the request came over HTTPS, or "on" / "off" */
+  secureCookies: (process.env.SECURE_COOKIES ?? "auto") as "auto" | "on" | "off",
+  /** reverse proxies in front of the API whose X-Forwarded-For is trusted: 1 = nginx (default), 2 = Caddy + nginx, 0 = none */
+  trustProxyHops: num("TRUST_PROXY_HOPS", 1),
+  /** optional: fingerprint devices may push only from these addresses / ranges (comma separated, e.g. 41.208.10.5,10.0.0.0/24) */
+  iclockAllowedIps: (process.env.ICLOCK_ALLOWED_IPS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
 };
 
 export function assertSecretsStrong() {
@@ -35,4 +45,5 @@ export function assertSecretsStrong() {
     if (v.length < 32) throw new Error(`${k} must be at least 32 characters`);
   }
   if (config.jwtSecret === config.platformJwtSecret) throw new Error("JWT_SECRET and PLATFORM_JWT_SECRET must differ");
+  if (config.dataEncryptionKey && config.dataEncryptionKey.length < 32) throw new Error("DATA_ENCRYPTION_KEY must be at least 32 characters");
 }

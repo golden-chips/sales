@@ -98,7 +98,12 @@ export function Settlements() {
   const list = useAsync(() => api.get(`/distribution/settlements?companyId=${companyId}${status ? `&status=${status}` : ""}`), [companyId, status]);
   const hand = useAsync(() => api.get(`/distribution/handovers?companyId=${companyId}${status === "submitted" ? "&status=submitted" : ""}`), [companyId, status]);
   const detail = useAsync(() => (open ? api.get(`/distribution/settlements/${open}`) : Promise.resolve(null)), [open]);
-  const approve = async () => { try { await api.post(`/distribution/settlements/${open}/approve`); toast(t.savedOk); detail.reload(); list.reload(); } catch (e) { toast(errMsg(e, lang), true); } };
+  // overage of a lot-tracked item: which lot it goes to (default: the lot this van moved most recently)
+  const [lotPick, setLotPick] = useState<Record<string, string>>({});
+  const approve = async () => {
+    const lots = Object.entries(lotPick).filter(([, v]) => v).map(([itemId, lotId]) => ({ itemId, lotId }));
+    try { await api.post(`/distribution/settlements/${open}/approve`, { lots }); toast(t.savedOk); setLotPick({}); detail.reload(); list.reload(); } catch (e) { toast(errMsg(e, lang), true); }
+  };
   const confirmCash = async (h: any) => {
     const counted = await ask(`${tt("المبلغ المعدود فعليًا (المصرّح", "Counted amount (declared")} ${fmt(h.declared_amount)})`, { initial: String(Number(h.declared_amount)) });
     if (!counted) return;
@@ -119,7 +124,12 @@ export function Settlements() {
     {open && <Modal title={detail.data?.number ?? tt("تسوية", "Settlement")} onClose={() => setOpen(null)} footer={detail.data?.status === "submitted" && can("distribution.settlements.approve") && <button className="btn primary" onClick={approve}>{tt("اعتماد", "Approve")}</button>}>
       {detail.loading ? <Loading /> : detail.data && <div className="grid"><LinesTable rows={detail.data.lines} cols={[{ h: tt("الصنف", "Item"), v: (l) => `${l.item_code} ${l.item_name_ar}` },
         { h: tt("الدفتري", "Book"), v: (l) => fmt(l.book_qty, 0), end: true }, { h: tt("المعدود", "Counted"), v: (l) => fmt(l.counted_qty, 0), end: true },
-        { h: tt("الفرق", "Diff"), v: (l) => <b style={{ color: Number(l.diff) < 0 ? "var(--bad)" : Number(l.diff) > 0 ? "var(--warn)" : undefined }}>{fmt(l.diff, 0)}</b>, end: true }]} />
+        { h: tt("الفرق", "Diff"), v: (l) => <b style={{ color: Number(l.diff) < 0 ? "var(--bad)" : Number(l.diff) > 0 ? "var(--warn)" : undefined }}>{fmt(l.diff, 0)}</b>, end: true },
+        ...(detail.data.status === "submitted" && detail.data.lines.some((l: any) => l.lot_options) ? [{ h: tt("تشغيلة الزيادة", "Overage lot"), v: (l: any) => l.lot_options
+          ? <select value={lotPick[l.item_id] ?? ""} onChange={(e) => setLotPick({ ...lotPick, [l.item_id]: e.target.value })} style={{ minWidth: 150 }}>
+              <option value="">{tt("آخر تشغيلة في السيارة (تلقائي)", "Latest lot in the van (auto)")}</option>
+              {l.lot_options.map((o: any) => <option key={o.id} value={o.id}>{o.lot_no}{o.expiry_date ? ` · ${tt("ينتهي", "exp")} ${fmtDate(o.expiry_date)}` : ""}</option>)}
+            </select> : "" }] : [])]} />
         <p>{tt("العهدة النقدية الحالية", "Current cash custody")}: <b className="num">{fmt(detail.data.custody)}</b></p></div>}
     </Modal>}
   </>;

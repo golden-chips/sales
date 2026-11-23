@@ -131,7 +131,7 @@ function SecurityPane() {
 }
 
 // ------------------------------------------------------------------ simple reference lists
-type Col = { h: [string, string]; v: (r: any) => ReactNode };
+type Col = { h: [string, string]; v: (r: any, reload: () => void) => ReactNode };
 type In = { k: string; l: [string, string]; type?: "text" | "number" | "time" | "date" | "select" | "check"; opts?: [string, string, string][]; def?: unknown; ltr?: boolean };
 function RefList({ title, desc, path, cols, inputs, canAdd, extra }: { title: [string, string]; desc?: [string, string]; path: string; cols: Col[]; inputs: In[]; canAdd: boolean; extra?: (b: any) => any }) {
   const { tt, pick, lang } = useI18n();
@@ -149,7 +149,7 @@ function RefList({ title, desc, path, cols, inputs, canAdd, extra }: { title: [s
     <ErrorBox error={list.error} />
     {list.loading ? <Loading rows={2} /> : <div className="table-wrap"><table>
       <thead><tr>{cols.map((c) => <th key={c.h[1]}>{pick(...c.h)}</th>)}</tr></thead>
-      <tbody>{(list.data ?? []).length ? list.data.map((r: any, i: number) => <tr key={r.id ?? i}>{cols.map((c) => <td key={c.h[1]}>{c.v(r)}</td>)}</tr>)
+      <tbody>{(list.data ?? []).length ? list.data.map((r: any, i: number) => <tr key={r.id ?? i}>{cols.map((c) => <td key={c.h[1]}>{c.v(r, list.reload)}</td>)}</tr>)
         : <tr><td colSpan={cols.length} style={{ color: "var(--muted)" }}>{tt("لا يوجد بعد", "None yet")}</td></tr>}</tbody></table></div>}
     {canAdd && <div className="add-row">
       {inputs.map((i) => <Field key={i.k} label={pick(...i.l)}>{i.type === "select" ? <select value={f[i.k]} onChange={(e) => setF({ ...f, [i.k]: e.target.value })}>{i.opts!.map(([v, ar, en]) => <option key={v} value={v}>{pick(ar, en)}</option>)}</select>
@@ -235,6 +235,25 @@ function PosPane() {
 }
 
 // ------------------------------------------------------------------ HR & fingerprint
+const ipList = (v: unknown) => String(v ?? "").split(/[,\s،]+/).map((x) => x.trim()).filter(Boolean);
+function DeviceAddresses({ d, reload, canEdit }: { d: any; reload: () => void; canEdit: boolean }) {
+  const { tt, lang } = useI18n();
+  const { toast, ask } = useToast();
+  const ips: string[] = d.allowed_ips ?? [];
+  const edit = async () => {
+    const v = await ask(tt("العناوين المسموح لها بالإرسال (فارغ = من أي مكان)", "Addresses allowed to push (empty = anywhere)"), { label: tt("مثل: 41.208.10.5 أو 10.0.0.0/24", "e.g. 41.208.10.5 or 10.0.0.0/24"), initial: ips.join(", ") });
+    if (v === null) return;
+    try { await api.patch(`/hr/devices/${d.id}`, { allowedIps: ipList(v) }); toast(tt("حُفظت العناوين", "Saved")); reload(); } catch (e) { toast(errMsg(e, lang), true); }
+  };
+  const toggle = async () => {
+    try { await api.patch(`/hr/devices/${d.id}`, { isActive: !d.is_active }); reload(); } catch (e) { toast(errMsg(e, lang), true); }
+  };
+  return <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+    {ips.length ? ips.map((x) => <code key={x} dir="ltr">{x}</code>) : <span className="badge warn">{tt("من أي مكان", "Anywhere")}</span>}
+    {canEdit && <button className="btn sm" onClick={edit}>{tt("تعديل", "Edit")}</button>}
+    {canEdit && <button className="btn sm" onClick={toggle}>{d.is_active ? tt("إيقاف", "Switch off") : tt("تشغيل", "Switch on")}</button>}
+  </span>;
+}
 function HrPane() {
   const { tt } = useI18n();
   const { can } = useSession();
@@ -242,10 +261,14 @@ function HrPane() {
   const hrSet = can("hr.settings.manage"), hrMan = can("hr.employees.manage");
   return <>
     <RefList title={["أجهزة البصمة", "Fingerprint devices"]} path="/hr/devices" canAdd={hrSet}
-      desc={["أجهزة ZKTeco وما يشابهها التي تدعم خاصية Cloud / ADMS: سجّل الرقم التسلسلي هنا، ثم اضبط الجهاز ليرسل إلى خادم النظام.", "ZKTeco-type devices with Cloud/ADMS push: register the serial here, then point the device at this server."]}
+      desc={["أجهزة ZKTeco وما يشابهها التي تدعم خاصية Cloud / ADMS: سجّل الرقم التسلسلي هنا، ثم اضبط الجهاز ليرسل إلى خادم النظام. للأمان: حدّد عنوان الإنترنت الثابت للمصنع في «العناوين المسموح بها» فلا يُقبل الإرسال من أي مكان آخر.",
+        "ZKTeco-type devices with Cloud/ADMS push: register the serial here, then point the device at this server. For safety, enter the factory's fixed internet address under “Allowed addresses” so pushes from anywhere else are refused."]}
       cols={[{ h: ["الاسم", "Name"], v: (r) => r.name }, { h: ["الرقم التسلسلي", "Serial"], v: (r) => <code>{r.serial_number}</code> },
-        { h: ["آخر اتصال", "Last seen"], v: (r) => r.last_seen_at ? <span className="badge ok">{fmtDate(r.last_seen_at)}</span> : <span className="badge warn">{tt("لم يتصل بعد", "Not yet")}</span> }]}
-      inputs={[{ k: "name", l: ["اسم الجهاز (مثل: بصمة المصنع)", "Device name"] }, { k: "serialNumber", l: ["الرقم التسلسلي (SN)", "Serial number"], ltr: true }]} />
+        { h: ["آخر اتصال", "Last seen"], v: (r) => !r.is_active ? <span className="badge">{tt("موقوف", "Off")}</span> : r.last_seen_at ? <span className="badge ok">{fmtDate(r.last_seen_at)}</span> : <span className="badge warn">{tt("لم يتصل بعد", "Not yet")}</span> },
+        { h: ["العناوين المسموح بها", "Allowed addresses"], v: (r, reload) => <DeviceAddresses d={r} reload={reload} canEdit={hrSet} /> }]}
+      inputs={[{ k: "name", l: ["اسم الجهاز (مثل: بصمة المصنع)", "Device name"] }, { k: "serialNumber", l: ["الرقم التسلسلي (SN)", "Serial number"], ltr: true },
+        { k: "allowedIps", l: ["العناوين المسموح بها (اختياري، افصل بفاصلة)", "Allowed addresses (optional, comma separated)"], ltr: true }]}
+      extra={(b) => ({ ...b, allowedIps: ipList(b.allowedIps) })} />
     <Pane title={tt("ضبط جهاز البصمة", "Device set-up")}>
       <ol className="steps">
         <li>{tt("في الجهاز: القائمة ← الاتصال (Comm) ← إعدادات الخادم السحابي (Cloud Server / ADMS).", "On the device: Menu → Comm → Cloud Server / ADMS settings.")}</li>

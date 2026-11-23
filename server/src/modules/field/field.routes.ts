@@ -125,9 +125,10 @@ export async function fieldRoutes(app: FastifyInstance) {
     const { id } = parse(id$, req.params);
     return tdb(req, (db) => f.getSettlement(db, id));
   });
-  app.post("/distribution/settlements/:id/approve", { schema: { ...D, summary: "Approve: shortages charged to the rep, overages to inventory adjustment" }, preHandler: can("distribution.settlements.approve") }, async (req) => {
+  app.post("/distribution/settlements/:id/approve", { schema: { ...D, summary: "Approve: shortages charged to the rep, overages to inventory adjustment (lots: which lot an overage of a lot-tracked item goes to)" }, preHandler: can("distribution.settlements.approve") }, async (req) => {
     const { id } = parse(id$, req.params);
-    return tdb(req, (db) => f.approveSettlement(db, req.user!, id));
+    const b = parse(z.object({ lots: z.array(z.object({ itemId: zUuid, lotId: zUuid })).max(500).optional() }), req.body ?? {});
+    return tdb(req, (db) => f.approveSettlement(db, req.user!, id, b));
   });
   app.get("/distribution/handovers", { schema: { ...D, summary: "Cash handovers" }, preHandler: can("distribution.reps.view") }, async (req) => {
     const q = parse(z.object({ companyId: zUuid, status: z.enum(["submitted", "confirmed", "rejected"]).optional() }), req.query);

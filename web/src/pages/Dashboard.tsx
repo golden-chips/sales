@@ -67,7 +67,7 @@ export default function Dashboard() {
 
   return <>
     <section className="welcome">
-      <div><div className="date">{dateText}</div><h1>{greet}، {me!.user.full_name.split(" ")[0]}</h1>
+      <div><div className="date">{dateText}</div><h1>{greet}، {me!.user.full_name.split(/\s+/).filter((w) => w.toUpperCase() !== "DEMO").slice(0, 2).join(" ") || me!.user.full_name}</h1>
         <p>{pick(me!.tenant.legal_name, me!.tenant.name_en)}</p></div>
       <div className="row" style={{ gap: 10 }}>
         {can("bi.dashboards.view") && has("bi") && <Link to="/bi" className="btn primary"><TrendingUp size={17} />{tt("لوحة الأداء", "Performance")}</Link>}

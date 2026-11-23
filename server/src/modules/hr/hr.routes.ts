@@ -1,5 +1,7 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
+import { BlockList, isIP } from "node:net";
 import { z } from "zod";
+import { config } from "../../config.js";
 import { can, tdb } from "../../core/auth.js";
 import { parse, zUuid, zMoney, zDate } from "../../core/http.js";
 import { E } from "../../core/errors.js";
@@ -14,6 +16,13 @@ const id$ = z.object({ id: zUuid });
 const zCode = z.string().regex(/^[A-Z0-9_-]{1,20}$/);
 const zPeriod = z.string().regex(/^\d{4}-\d{2}$/);
 const zTime = z.string().regex(/^\d{2}:\d{2}$/);
+/** addresses or ranges: 41.208.10.5, 10.0.0.0/24, 2001:db8::/32 */
+const zIpList = z.array(z.string().trim().refine((v) => {
+  const [ip, bits, extra] = v.split("/");
+  const fam = isIP(ip);
+  if (!fam || extra !== undefined) return false;
+  return bits === undefined || (/^\d{1,3}$/.test(bits) && Number(bits) <= (fam === 4 ? 32 : 128));
+}, { message: "invalid IP address or range" })).max(20);
 const ac = (req: any) => ({ tenantId: req.user.tenantId, actorType: "user" as const, actorId: req.user.userId, ip: req.ip, requestId: req.id });
 
 export async function hrRoutes(app: FastifyInstance) {
@@ -25,8 +34,8 @@ export async function hrRoutes(app: FastifyInstance) {
       (b: any) => [["code", b.code], ["name_ar", b.nameAr], ["start_time", b.start], ["end_time", b.end], ["break_minutes", b.breakMinutes]]],
     ["/hr/leave-types", "leave_types", "hr.settings.manage", z.object({ companyId: zUuid, code: zCode, nameAr: z.string().min(2), paid: z.boolean().default(true), annualDays: zMoney.nullable().optional() }),
       (b: any) => [["code", b.code], ["name_ar", b.nameAr], ["paid", b.paid], ["annual_days", b.annualDays ?? null]]],
-    ["/hr/devices", "attendance_devices", "hr.settings.manage", z.object({ companyId: zUuid, serialNumber: z.string().regex(/^[A-Za-z0-9_-]{4,40}$/), name: z.string().min(2) }),
-      (b: any) => [["serial_number", b.serialNumber], ["name", b.name]]],
+    ["/hr/devices", "attendance_devices", "hr.settings.manage", z.object({ companyId: zUuid, serialNumber: z.string().regex(/^[A-Za-z0-9_-]{4,40}$/), name: z.string().min(2), allowedIps: zIpList.default([]) }),
+      (b: any) => [["serial_number", b.serialNumber], ["name", b.name], ["allowed_ips", b.allowedIps]]],
     ["/payroll/components", "pay_components", "payroll.components.manage", z.object({ companyId: zUuid, code: zCode, nameAr: z.string().min(2), kind: z.enum(["earning", "deduction"]),
       method: z.enum(["fixed", "percent_of_basic"]), defaultValue: zMoney.default("0"), appliesToAll: z.boolean().default(false) }),
       (b: any) => [["code", b.code], ["name_ar", b.nameAr], ["kind", b.kind], ["method", b.method], ["default_value", b.defaultValue], ["applies_to_all", b.appliesToAll]]],
@@ -47,6 +56,19 @@ export async function hrRoutes(app: FastifyInstance) {
       }));
     });
   }
+
+  app.patch("/hr/devices/:id", { schema: { ...H, summary: "Rename / switch off a fingerprint device or limit the addresses it may push from" }, preHandler: can("hr.settings.manage") }, async (req) => {
+    const { id } = parse(z.object({ id: zUuid }), req.params);
+    const b = parse(z.object({ name: z.string().min(2).optional(), isActive: z.boolean().optional(), allowedIps: zIpList.optional() }), req.body);
+    return tdb(req, async (db) => {
+      const before = (await db.query("SELECT * FROM attendance_devices WHERE id = $1", [id])).rows[0];
+      if (!before) throw E.notFound("attendance_devices");
+      const r = (await db.query("UPDATE attendance_devices SET name = coalesce($2, name), is_active = coalesce($3, is_active), allowed_ips = coalesce($4::cidr[], allowed_ips) WHERE id = $1 RETURNING *",
+        [id, b.name ?? null, b.isActive ?? null, b.allowedIps ?? null])).rows[0];
+      await audit(db, { ...ac(req), action: "attendance_devices.updated", entityType: "attendance_devices", entityId: id, before, after: r });
+      return r;
+    });
+  });
 
   app.get("/hr/holidays", { schema: { ...H, summary: "Public holidays" }, preHandler: can("hr.employees.view") }, async (req) => {
     const q = parse(z.object({ companyId: zUuid }), req.query);
@@ -266,30 +288,40 @@ export async function hrRoutes(app: FastifyInstance) {
   });
 }
 
-/** ZKTeco iclock/ADMS push protocol — devices cannot authenticate, so the serial number must be registered */
+/** ZKTeco iclock/ADMS push protocol — devices cannot authenticate, so the serial number must be registered.
+ *  Optionally a device (or every device: ICLOCK_ALLOWED_IPS) may push only from listed addresses (K26). */
 export async function iclockRoutes(app: FastifyInstance) {
   app.addContentTypeParser("*", { parseAs: "string" }, (_req, body, done) => done(null, body));
-  const device = async (sn: unknown) => {
+  const globalAllow = new BlockList();
+  for (const c of config.iclockAllowedIps) {
+    const [ip, bits] = c.split("/");
+    const type = isIP(ip) === 6 ? "ipv6" : "ipv4";
+    if (bits) globalAllow.addSubnet(ip, Number(bits), type); else globalAllow.addAddress(ip, type);
+  }
+  const device = async (req: FastifyRequest, sn: unknown) => {
     if (typeof sn !== "string" || !/^[A-Za-z0-9_-]{4,40}$/.test(sn)) return null;
-    const d = await withAnonymous(async (db) => (await db.query("SELECT * FROM device_by_serial($1)", [sn])).rows[0]);
+    const ip = req.ip.replace(/^::ffff:/, "");
+    if (config.iclockAllowedIps.length && !globalAllow.check(ip, isIP(ip) === 6 ? "ipv6" : "ipv4")) { req.log.warn({ ip, sn }, "iclock push from an address outside ICLOCK_ALLOWED_IPS"); return null; }
+    const d = await withAnonymous(async (db) => (await db.query("SELECT * FROM device_for_push($1, $2::inet)", [sn, ip])).rows[0]);
+    if (d && !d.ip_allowed) { req.log.warn({ ip, sn }, "iclock push from an address not allowed for this device"); return null; }
     return d?.is_active ? d : null;
   };
   app.get("/iclock/cdata", { schema: { hide: true } }, async (req, reply) => {
     const q = req.query as any;
-    const d = await device(q.SN);
+    const d = await device(req, q.SN);
     if (!d) return reply.code(404).type("text/plain").send("UNKNOWN");
     return reply.type("text/plain").send(`GET OPTION FROM: ${q.SN}\nATTLOGStamp=None\nOPERLOGStamp=9999\nErrorDelay=60\nDelay=30\nTransTimes=00:00;14:05\nTransInterval=1\nTransFlag=1000000000\nRealtime=1\nEncrypt=0\n`);
   });
   app.post("/iclock/cdata", { schema: { hide: true } }, async (req, reply) => {
     const q = req.query as any;
-    const d = await device(q.SN);
+    const d = await device(req, q.SN);
     if (!d) return reply.code(404).type("text/plain").send("UNKNOWN");
     if (String(q.table ?? "").toUpperCase() !== "ATTLOG") return reply.type("text/plain").send("OK");
     const r = await withTenant(d.tenant_id, null, (db) => hr.ingestAttlog(db, d, String(req.body ?? "")));
     return reply.type("text/plain").send(`OK: ${r.stored}`);
   });
   app.get("/iclock/getrequest", { schema: { hide: true } }, async (req, reply) => {
-    const d = await device((req.query as any).SN);
+    const d = await device(req, (req.query as any).SN);
     return reply.code(d ? 200 : 404).type("text/plain").send(d ? "OK" : "UNKNOWN");
   });
 }

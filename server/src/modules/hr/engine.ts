@@ -166,6 +166,17 @@ export function computePay(p: PayInput): PayResult {
   if (earned < 0n) earned = 0n;
   // recoveries never push net below zero: statutory first, then loans, then shortages (remainder carries over)
   const statutory = min(stat, earned);
+  if (statutory < stat) {
+    // earnings do not cover all deductions: each deduction line is reduced in proportion, so the lines add up
+    // exactly to what was withheld (K27); the last deduction line takes the rounding remainder
+    const ded = items.filter((x) => x.kind === "deduction");
+    let given = 0n;
+    ded.forEach((x, i) => {
+      const share = i === ded.length - 1 ? statutory - given : round(div(mul(dec(x.amount), statutory), stat), m);
+      given += share;
+      x.amount = fmt(share, m);
+    });
+  }
   const loan = min(dec(p.loanInstallments), earned - statutory);
   const shortage = min(dec(p.shortageOutstanding), earned - statutory - loan);
   const net = earned - statutory - loan - shortage;

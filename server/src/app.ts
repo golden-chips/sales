@@ -47,7 +47,8 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     logger: opts.logger === false ? false : { level: config.logLevel, redact: ["req.headers.authorization", "req.headers.cookie"] },
     genReqId: (req) => (typeof req.headers["x-request-id"] === "string" ? req.headers["x-request-id"].slice(0, 64) : randomUUID()),
     bodyLimit: 1_048_576,
-    trustProxy: true,
+    // only the reverse proxies we run are trusted for X-Forwarded-For (a client cannot fake its address)
+    trustProxy: (_addr: string, hop: number) => hop < config.trustProxyHops,
   });
 
   // zod is the single source of validation (see core/http.ts::parse); route
@@ -55,7 +56,8 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   app.setValidatorCompiler(() => () => true);
 
   await app.register(helmet, { contentSecurityPolicy: false });
-  await app.register(cors, { origin: config.corsOrigins, credentials: false });
+  // credentials: the browser sends the httpOnly refresh cookie (same origin in production; allowed origins only)
+  await app.register(cors, { origin: config.corsOrigins, credentials: true });
   // Limits are per signed-in session, not per IP: a whole factory or shop shares one public IP behind its
   // router, so an IP limit would block everyone at once. Requests without a token (login attempts, scans)
   // keep the strict per-IP limit. The bearer token is only hashed into a key here; it is verified later.

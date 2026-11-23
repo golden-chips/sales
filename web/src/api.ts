@@ -1,6 +1,7 @@
-// Thin API client. Access token in memory + sessionStorage (tab-scoped);
-// refresh token rotates on every use. See docs/SECURITY.md (known issue:
-// move refresh token to an httpOnly cookie before production).
+// Thin API client. The short-lived access token is kept in sessionStorage (tab-scoped).
+// On the web the refresh token lives in an httpOnly cookie that scripts cannot read; it is used
+// together with a CSRF token (readable cookie echoed in a header) and rotates on every use.
+// Inside the Android app (another origin) the refresh token stays in the app's private storage.
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public messageAr: string, public details?: any) { super(message); }
 }
@@ -10,7 +11,17 @@ type Scope = "tenant" | "platform";
 export const API_BASE = ((import.meta as any).env?.VITE_API_BASE ?? "").replace(/\/$/, "");
 const KEY = { tenant: "ge.session", platform: "ge.platform" };
 
-export interface Session { accessToken: string; refreshToken?: string }
+/** refreshToken: native app only; cookie: the refresh token is in the httpOnly cookie (web) */
+export interface Session { accessToken: string; refreshToken?: string; cookie?: boolean }
+/** the web app is served from the API's origin → cookie sessions */
+export const COOKIE_MODE = API_BASE === "" && !(globalThis as any).Capacitor?.isNativePlatform?.();
+const readCookie = (name: string) => {
+  for (const part of document.cookie.split(";")) { const [k, ...v] = part.trim().split("="); if (k === name) return decodeURIComponent(v.join("=")); }
+  return null;
+};
+/** a browser session exists (another tab signed in): this tab can sign in silently */
+export const hasCookieSession = () => COOKIE_MODE && !!readCookie("ge_csrf");
+const canRefresh = (s: Session | null) => !!(s?.refreshToken || s?.cookie || (!s && hasCookieSession()));
 export function getSession(scope: Scope): Session | null {
   try { const v = sessionStorage.getItem(KEY[scope]); return v ? JSON.parse(v) : null; } catch { return null; }
 }
@@ -19,13 +30,27 @@ export function setSession(scope: Scope, s: Session | null) {
 }
 
 let refreshing: Promise<boolean> | null = null;
-async function refresh(): Promise<boolean> {
+async function refreshOnce(): Promise<Response> {
   const s = getSession("tenant");
-  if (!s?.refreshToken) return false;
-  refreshing ??= fetch(`${API_BASE}/api/v1/auth/refresh`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ refreshToken: s.refreshToken }) })
-    .then(async (r) => { if (!r.ok) { setSession("tenant", null); return false; } const j = await r.json(); setSession("tenant", { accessToken: j.accessToken, refreshToken: j.refreshToken }); return true; })
-    .finally(() => { refreshing = null; });
-  return refreshing;
+  if (s?.refreshToken) return fetch(`${API_BASE}/api/v1/auth/refresh`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ refreshToken: s.refreshToken }) });
+  return fetch(`${API_BASE}/api/v1/auth/refresh`, { method: "POST", credentials: "same-origin",
+    headers: { "content-type": "application/json", "x-session-mode": "cookie", "x-csrf-token": readCookie("ge_csrf") ?? "" }, body: "{}" });
+}
+async function doRefresh(): Promise<boolean> {
+  let r = await refreshOnce();
+  // another tab rotated the cookie a moment ago: the browser already holds the new one
+  for (let i = 0; i < 3 && r.status === 422; i++) { await new Promise((ok) => setTimeout(ok, 300)); r = await refreshOnce(); }
+  if (!r.ok) { if (r.status === 401 || r.status === 403) setSession("tenant", null); return false; }   // a server restart (5xx) keeps the session
+  const j = await r.json();
+  setSession("tenant", j.refreshToken ? { accessToken: j.accessToken, refreshToken: j.refreshToken } : { accessToken: j.accessToken, cookie: true });
+  return true;
+}
+/** one refresh at a time — across tabs too where the browser supports Web Locks */
+export async function refresh(): Promise<boolean> {
+  if (!canRefresh(getSession("tenant"))) return false;
+  const locks = (navigator as any).locks;
+  refreshing ??= (locks ? locks.request("ge-refresh", doRefresh) : doRefresh()).finally(() => { refreshing = null; });
+  return refreshing!;
 }
 
 export async function request<T = any>(method: string, path: string, body?: unknown, opts: { scope?: Scope; idempotencyKey?: string } = {}): Promise<T> {
@@ -36,10 +61,11 @@ export async function request<T = any>(method: string, path: string, body?: unkn
     if (body !== undefined) headers["content-type"] = "application/json";
     if (s) headers.authorization = `Bearer ${s.accessToken}`;
     if (opts.idempotencyKey) headers["idempotency-key"] = opts.idempotencyKey;
-    return fetch(`${API_BASE}/api/v1${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    if (COOKIE_MODE) headers["x-session-mode"] = "cookie";   // sign-in answers set the httpOnly cookie instead of returning the token
+    return fetch(`${API_BASE}/api/v1${path}`, { method, headers, credentials: "same-origin", body: body === undefined ? undefined : JSON.stringify(body) });
   };
   let res = await go();
-  if (res.status === 401 && scope === "tenant" && getSession("tenant")?.refreshToken && !path.startsWith("/auth/")) {
+  if (res.status === 401 && scope === "tenant" && canRefresh(getSession("tenant")) && !path.startsWith("/auth/login") && !path.startsWith("/auth/refresh")) {
     if (await refresh()) res = await go();
   }
   // too many requests: a read is retried once after the server's suggested pause

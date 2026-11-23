@@ -31,6 +31,9 @@ services:
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?run setup.sh}
       JWT_SECRET: ${JWT_SECRET:?run setup.sh}
       PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:?run setup.sh}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-}      # encrypts MFA secrets in the database — back it up with .env
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}           # 1 = nginx, 2 = Caddy (HTTPS) + nginx
+      ICLOCK_ALLOWED_IPS: ${ICLOCK_ALLOWED_IPS:-}        # optional: fingerprint devices may push only from these addresses
       CORS_ORIGINS: ${PUBLIC_URL:-http://localhost}
       LOG_LEVEL: info
       TZ: Africa/Tripoli

@@ -16,12 +16,17 @@
 | API hardening | Helmet headers, CORS allow-list, 1 MB body limit, global + login rate limits, request id on every response, no stack traces to clients, zod validation, parameterized SQL only, whitelisted ORDER BY |
 | Secrets | Only from environment variables; `.env` git-ignored; startup asserts JWT secrets ≥ 32 chars and distinct |
 | XSS | React escapes output; no `dangerouslySetInnerHTML` |
-| CSRF | API uses `Authorization: Bearer` headers, not cookies → not CSRF-exposed in the current design |
+| Web session (0.9) | Refresh token in an `httpOnly; SameSite=Strict` cookie limited to `/api/v1/auth` (Secure over HTTPS), never visible to page scripts; browser-session lifetime (gone when the browser closes) plus the server-side expiry; the short-lived access token stays in tab storage. Two tabs refreshing at once are serialised (Web Locks) and a rotation race within 20 s is answered "retry" instead of revoking the session. The Android app (another origin) keeps the token in its private storage and sends it in the body |
+| CSRF | All data endpoints need `Authorization: Bearer` (a header a forged cross-site request cannot set). The only cookie-authenticated endpoint, `/auth/refresh`, also requires `X-CSRF-Token` equal to the readable `ge_csrf` cookie (double submit) and the cookies are `SameSite=Strict` |
+| Secrets at rest (0.9) | MFA (TOTP) secrets encrypted with AES-256-GCM (`DATA_ENCRYPTION_KEY`); secrets saved before 0.9 are re-encrypted at the next sign-in |
+| Per-company limit (0.9) | Each plan's requests per minute (`api_rpm`) applies to all the company's users together (429 `TENANT_RATE_LIMITED` with `Retry-After`), on top of the per-session and per-IP limits |
+| Client address | Only the configured number of reverse proxies is trusted for `X-Forwarded-For` (`TRUST_PROXY_HOPS`), so a client cannot fake its IP |
+| Fingerprint devices (0.9) | Devices cannot authenticate (iclock/ADMS sends only a serial number). Each device can be limited to listed addresses / ranges, and `ICLOCK_ALLOWED_IPS` limits all devices; pushes from elsewhere are refused and logged |
 
 ## Known gaps (tracked in KNOWN_ISSUES.md)
-* Web stores tokens in `sessionStorage` (tab-scoped). Before production: move the refresh token to an `httpOnly; Secure; SameSite=Strict` cookie and add CSRF protection for that endpoint.
-* Rate limiting is per process (in-memory); multi-instance deployments need a Redis store, and per-tenant `api_rpm` enforcement is not wired yet.
-* MFA secrets are stored in plain text in the DB (protected by RLS); encrypt with an application KMS key before production.
+* Rate limits and the per-company budget are counted per API process (in memory); a multi-instance deployment needs a shared store (Redis).
+* The data encryption key is an environment variable, not a managed key service (KMS); key rotation is not automated.
+* A fingerprint device on a network without a fixed public address can only be identified by its serial number.
 * No penetration test or dependency audit pipeline yet (npm audit reported 0 vulnerabilities for the server at install time; web reported advisories in dev tooling — review before production).
 * Webhooks, file uploads and e-signatures are not implemented yet, so their controls do not exist yet.
 

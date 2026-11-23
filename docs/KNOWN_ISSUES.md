@@ -2,9 +2,9 @@
 
 | # | Severity | Issue | Plan |
 |---|---|---|---|
-| K1 | High (pre-prod) | Refresh token kept in `sessionStorage` in the web app | httpOnly cookie + CSRF token before production |
-| K2 | Medium | Rate limiting is in-memory per instance; per-tenant `api_rpm` not enforced | Redis store + tenant key generator |
-| K3 | Medium | MFA secrets not encrypted at rest (RLS-protected) | App-level encryption with KMS key |
+| K1 | ~~High~~ **Resolved (0.9)** | Web refresh token now in an httpOnly SameSite=Strict cookie + CSRF token; the Android app keeps it in private storage | — |
+| K2 | Low (was Medium) | Each plan's `api_rpm` is now enforced per company (0.9). Counters are still in memory per API instance | Redis store if more than one API instance is run |
+| K3 | ~~Medium~~ **Resolved (0.9)** | MFA secrets encrypted at rest (AES-256-GCM, `DATA_ENCRYPTION_KEY`). Key held in the environment, not a KMS | KMS when hosting is decided (D5) |
 | K4 | ~~Medium~~ **Resolved (0.9)** | Financial statements arithmetic is done in SQL numeric | — |
 | K5 | ~~Medium~~ **Mostly resolved (0.9)** | Year-end close (closing entry to retained earnings, reopen with reason), bank reconciliation (statement entry/paste, auto-match ±7 days, adjusting drafts, uncleared items, reconcile), budgets (monthly by account, copy from last year ± %, approval, budget vs actual) are done (migration 021); fixed assets since 0.6. Still missing: unrealized FX revaluation | Later |
 | K6 | ~~Medium~~ **Resolved (0.9)** | All reasons and short inputs use an in-app dialog | — |
@@ -23,14 +23,14 @@
 | K19 | Medium | Weighted average is per warehouse+item, so all lots of an item share one cost (lot-level actual cost not supported) | Option for lot costing later if required |
 | K20 | Medium | Recall notices are queued in the outbox but **not sent**: the WhatsApp sender (company's Meta account) is not connected yet | Connect sender worker |
 | K21 | Medium | Existing Expo rep app not yet switched to the new API (adapter plan in FIELD_SALES_DISTRIBUTION.md); the web rep app is the tested alternative | Phase 4 remainder |
-| K22 | Low | On phone width the top bar stacks its controls and takes too much height | UI polish |
-| K23 | Low | Settlement overage on a lot-tracked item is put on the most recently moved lot in the van | Let the supervisor pick the lot |
+| K22 | ~~Low~~ **Resolved (0.9)** | Phone top bar is one compact row (menu, page, search, account); avatar initials skip "DEMO" and the Arabic article | — |
+| K23 | ~~Low~~ **Resolved (0.9)** | The supervisor picks the lot for an overage (lots this van held, with expiry); default stays the latest lot | — |
 
 Legacy systems findings (V1–V10, H1–H6) are in `PHASE0_DISCOVERY_AUDIT.md`; they live in the `van-sales-app` repository and were **not modified** in this phase.
 | K24 | Medium | Self-service signup has no email/phone verification and no CAPTCHA (rate limited only) | Before public launch |
 | K25 | Medium | Statutory payroll rates (social security, income tax) are not configured: each company defines them as pay components after its accountant confirms them | Decision D8 |
-| K26 | Medium | Fingerprint devices cannot authenticate; a registered serial number is the only key (spoofable on the network). Restrict the iclock path to the factory IP at the proxy | Deployment |
-| K27 | Low | Payroll: if earnings are smaller than statutory deductions, deduction line items are not pro-rated (total is capped) | Refine |
+| K26 | Low (was Medium) | Fingerprint devices still cannot authenticate (protocol limit), but each device can now be limited to the factory's address(es) in Settings, or all devices with `ICLOCK_ALLOWED_IPS` (0.9). Forwarded addresses are trusted only from the configured proxies | Use the allow-list when the factory has a fixed address |
+| K27 | ~~Low~~ **Resolved (0.9)** | When earnings do not cover the deductions, every deduction line is reduced in proportion and the lines add up exactly to what was withheld | — |
 | K28 | Low | Web dependency advisories left: react-router moderate (fix = v7, breaking), vite dev-server high (dev only; fix = vite 6+) | Planned upgrade |
 | K29 | Info | The APK talks to the server set in `GOLDEN_API_BASE`; without hosting (D5) it cannot reach a server | Hosting decision |
 | K30 | Low | HR engine ports the core حضوري rules; rosters/rotating shifts, multiple sites, coverage pay and supervisor tools from حضوري are not ported yet | Phase 5 remainder |

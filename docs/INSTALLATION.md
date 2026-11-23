@@ -41,18 +41,24 @@ Dev-only shortcut: `npx tsx scripts/reset-db.ts` drops and rebuilds a database *
 | `APP_DB_PASSWORD` | reset/seed | Password to set for `golden_app` |
 | `JWT_SECRET` | ✔ | ≥ 32 random chars (`openssl rand -base64 48`) |
 | `PLATFORM_JWT_SECRET` | ✔ | ≥ 32 random chars, **different** from `JWT_SECRET` |
+| `DATA_ENCRYPTION_KEY` | production | ≥ 32 random chars; encrypts MFA secrets in the database (AES-256-GCM). **Back it up with the database** — without it, users with two-step verification cannot sign in. If unset, a key is derived from `JWT_SECRET` (then changing `JWT_SECRET` breaks MFA). `setup.sh` generates it |
+| `TRUST_PROXY_HOPS` | | reverse proxies whose `X-Forwarded-For` is trusted: 1 = nginx (default), 2 = Caddy + nginx, 0 = none. A wrong value lets clients fake their address (login limits, device allow-list) |
+| `SECURE_COOKIES` | | `auto` (default: Secure flag when the request came over HTTPS), `on`, `off` |
+| `TENANT_RATE_LIMIT` | | `on` (default) enforces each plan's requests-per-minute for the whole company; `off` for load tests |
+| `ICLOCK_ALLOWED_IPS` | | optional, e.g. `41.208.10.5,10.0.0.0/24`: fingerprint devices may push only from these addresses (each device can also have its own list in Settings) |
 | `ACCESS_TOKEN_TTL_SEC` | | default 900 |
 | `REFRESH_TOKEN_TTL_SEC` | | default 604800 (7 days) |
 | `PORT`, `HOST` | | default 4000, 0.0.0.0 |
 | `CORS_ORIGINS` | | comma-separated allow-list |
-| `RATE_LIMIT_PER_MIN`, `LOGIN_RATE_LIMIT_PER_MIN` | | default 300 / 10 per IP |
+| `RATE_LIMIT_PER_MIN`, `LOGIN_RATE_LIMIT_PER_MIN` | | default 300 / 10 per IP (requests without a session) |
+| `USER_RATE_LIMIT_PER_MIN` | | default 600 per signed-in session |
 | `LOG_LEVEL` | | pino level, default `info` |
 | `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD` | seed | first platform super admin |
 | `GOLDEN_OWNER_EMAIL`, `GOLDEN_OWNER_PASSWORD` | seed | owner of tenant `golden-chips` |
 
 ## 4. Production deployment (recommended baseline)
 1. Managed PostgreSQL 16 (or a dedicated VM) with **PITR (WAL archiving)**, encrypted storage, private network only.
-2. API: 2+ instances behind a TLS-terminating reverse proxy (Caddy/Nginx); `NODE_ENV=production` (the server refuses to start if `DATABASE_URL` bypasses RLS).
+2. API behind a TLS-terminating reverse proxy (Caddy/Nginx); `NODE_ENV=production` (the server refuses to start if `DATABASE_URL` bypasses RLS). Rate limits and each company's request budget are counted per API process: with several instances, each allows the full budget (a shared store such as Redis is needed to count across instances — not built yet).
 3. Web: `npm run build` → static `web/dist` served by the same proxy; `/api` proxied to the API.
 4. Secrets in the host's secret manager, never in files committed to git.
 5. Separate **dev / staging / production** databases and secrets.

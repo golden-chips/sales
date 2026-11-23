@@ -43,6 +43,13 @@ export function TopControls() {
   </>;
 }
 
+/** "DEMO المدير العام" → "م ع": skips the DEMO label and the Arabic article "ال" */
+export function personInitials(name: string) {
+  const words = name.split(/\s+/).filter((w) => w && w.toUpperCase() !== "DEMO");
+  const first = (w: string) => (/^ال.{2,}/.test(w) ? w[2] : w[0]);
+  return words.slice(0, 2).map(first).join(" ").toUpperCase() || "?";
+}
+
 /** the company mark: initials on the brand gradient */
 export function Logo({ size = 40, text = "GC" }: { size?: number; text?: string }) {
   return <div className="logo-mark" style={{ width: size, height: size, fontSize: size * 0.36 }}>{text}</div>;
@@ -151,7 +158,7 @@ export function Shell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", k);
   }, [can, nav]);
   if (!me) return null;
-  const initials = me.user.full_name.split(" ").map((w: string) => w[0]).join("").slice(0, 2);
+  const initials = personInitials(me.user.full_name);
   return <div className="layout">
     <Sidebar groups={groups} open={open} onClose={() => setOpen(false)} />
     <div className="main">

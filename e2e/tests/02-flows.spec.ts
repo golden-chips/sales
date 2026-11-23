@@ -105,7 +105,9 @@ test("point of sale: cashier sells from the open shift and closes it (Z report)"
   await expect(modal(page).getByText("تم البيع").first()).toBeVisible();
   await expect(modal(page).locator(".receipt-paper")).toContainText("الإجمالي");
   await modal(page).getByRole("button", { name: /بيع جديد/ }).click();
+  await expect(page.locator(".receipt-paper")).toHaveCount(0);           // receipt closed
   await page.getByRole("button", { name: "إقفال الوردية" }).click();
+  await expect(modal(page).getByText("النقدية المعدودة")).toBeVisible();  // X report loaded
   await modal(page).locator("input").first().fill("0");
   await modal(page).getByRole("button", { name: "إقفال", exact: true }).click();
   await expect(modal(page).getByText("تقرير Z")).toBeVisible();

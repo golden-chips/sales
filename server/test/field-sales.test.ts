@@ -148,6 +148,24 @@ describe("field sales & distribution: load → offline sync → custody → day 
     expect(await gl("1132")).toBe("4.4000");
   });
 
+  it("settlement overage on a lot-tracked item goes to the lot the supervisor picks (K23)", async () => {
+    const shift = (n: number) => new Date(Date.parse(today) + n * 86_400_000).toISOString().slice(0, 10);
+    const day2 = today.endsWith("-12-31") ? shift(-1) : shift(1);   // one settlement per rep per day; stay in this fiscal year
+    const s = ok(await api("POST", "/api/v1/field/settlements", { settlementDate: day2, counts: [{ itemId: chips, countedQty: "167" }] }, as(R)));
+    const view = ok(await api("GET", `/api/v1/distribution/settlements/${s.id}`, undefined, as(S)), 200);
+    const line = view.lines.find((l: any) => l.item_id === chips);
+    expect(line.lot_options.map((x: any) => x.lot_no)).toContain("L1");
+    const other = await withTenant(T.tenantId, null, async (db) => (await db.query("SELECT id FROM lots WHERE item_id <> $1 LIMIT 1", [chips])).rows[0].id);
+    const bad = await api("POST", `/api/v1/distribution/settlements/${s.id}/approve`, { lots: [{ itemId: chips, lotId: other }] }, as(S));
+    expect(bad.body.error.code).toBe("LOT_MISMATCH");
+    const l1 = line.lot_options.find((x: any) => x.lot_no === "L1").id;
+    const a = ok(await api("POST", `/api/v1/distribution/settlements/${s.id}/approve`, { lots: [{ itemId: chips, lotId: l1 }] }, as(S)), 200);
+    expect(a.overage_value).toBe("1.6000");   // 2 × 0.8
+    expect(await vanQty(wh.VAN1)).toBe("167.0000");
+    const inLot = await withTenant(T.tenantId, null, async (db) => (await db.query("SELECT sum(qty)::text AS q FROM stock_moves WHERE source_type = 'van_settlement' AND source_id = $1 AND lot_id = $2", [s.id, l1])).rows[0].q);
+    expect(Number(inLot)).toBe(2);
+  });
+
   it("commissions on collected money: flat and tiered; finance posts with SoD", async () => {
     const run = ok(await api("POST", "/api/v1/distribution/commission-runs", { companyId: T.companyId, period }, as(F1)));
     const l1 = run.lines.find((l: any) => l.rep_code === "R1");

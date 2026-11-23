@@ -23,10 +23,17 @@ OWNER_DB_PASSWORD=$(rnd 32)
 APP_DB_PASSWORD=$(rnd 32)
 JWT_SECRET=$(rnd 64)
 PLATFORM_JWT_SECRET=$(rnd 64)
+DATA_ENCRYPTION_KEY=$(rnd 64)
 SEED_DEMO=${SEED_DEMO:-true}
 DEFAULT_TENANT=${DEFAULT_TENANT:-}
 ENV
   echo "created deploy/.env with random secrets"
+fi
+# settings added in later versions (never overwrite an existing value: the encryption key protects stored secrets)
+grep -q '^DATA_ENCRYPTION_KEY=' .env || { echo "DATA_ENCRYPTION_KEY=$(rnd 64)" >> .env; echo "added DATA_ENCRYPTION_KEY to deploy/.env — keep it with your backups"; }
+if ! grep -q '^TRUST_PROXY_HOPS=' .env; then
+  # nginx in front of the API = 1; Caddy (HTTPS) + nginx = 2
+  if grep -q '^DOMAIN=.\+' .env; then echo "TRUST_PROXY_HOPS=2" >> .env; else echo "TRUST_PROXY_HOPS=1" >> .env; fi
 fi
 set -a; . ./.env; set +a
 

@@ -13,7 +13,16 @@
 - **Purchase price variance** (final supplier invoice) and **landed costs** (migration 020): spread over the receipt's goods still on hand, the used share to stock differences. Supplier invoice is now entered in a proper form (no browser prompt).
 - **POS offline**: keeps selling without a connection (cash/card), provisional receipt, automatic sending when back online, rejected sales listed for review, shift close blocked while sales wait; the app also reopens offline after a reload (last profile kept on the device).
 - **Year-end close** and reopen; **bank reconciliation** (paste the statement, automatic matching, adjusting entries, uncleared cheques, reconcile); **budgets** (monthly, copy last year ± %, approval, budget vs actual) — migration 021. Financial statements computed in SQL. Every browser `prompt()` replaced by an in-app dialog.
+### Security
+- Web sign-in: the refresh token is kept in an **httpOnly cookie** with a CSRF token (scripts cannot read it); a new tab of the same browser opens signed in; closing the browser ends the session. The Android app is unchanged.
+- **MFA secrets encrypted** in the database (`DATA_ENCRYPTION_KEY`; `setup.sh` adds it to existing installations).
+- Each plan's **requests per minute** now apply to the whole company.
+- **Fingerprint devices** can be limited to the factory's address(es) (migration 022; Settings → HR); `ICLOCK_ALLOWED_IPS` for all devices.
+- The API trusts `X-Forwarded-For` only from its own proxies (`TRUST_PROXY_HOPS`) — before, a client could fake its address and dodge the per-IP login limit.
 ### Fixed
+- Van settlement: the supervisor chooses the lot an overage of a lot-tracked item goes to (K23).
+- Payroll: deduction lines are reduced in proportion when earnings do not cover them, so the lines match the total withheld (K27).
+- Avatar initials and the home greeting no longer show "DEMO"/"ال" letters.
 - Receipt showed "received / change" with the two numbers in reversed order.
 - Creating a role did not check that the creator holds the permissions granted (editing did).
 

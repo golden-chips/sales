@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { withAnonymous, withTenant, type Db } from "../../db/pool.js";
@@ -8,10 +8,45 @@ import { audit } from "../../core/audit.js";
 import { authenticateUser } from "../../core/auth.js";
 import { config } from "../../config.js";
 import {
-  DUMMY_HASH, hashPassword, newOpaqueToken, newTotpSecret, passwordProblems, sha256, signAccess, totpUri, verifyPassword, verifyTotp,
+  DUMMY_HASH, encryptSecret, hashPassword, isEncrypted, newOpaqueToken, newTotpSecret, passwordProblems, sha256, signAccess, totpUri, verifyPassword, verifyTotp,
 } from "../../core/security.js";
 
 const T = { tags: ["Auth"] };
+
+// ------------------------------------------------------------------ refresh token delivery (K1)
+// Browsers send `X-Session-Mode: cookie`: the refresh token is then set as an httpOnly, SameSite=Strict cookie
+// limited to /api/v1/auth (JavaScript cannot read it) and is left out of the response body. A second,
+// readable cookie carries a CSRF token that must be echoed in `X-CSRF-Token` to use the refresh cookie.
+// Native clients (the Android app) keep receiving the token in the body and send it back in the body.
+const RT_COOKIE = "ge_rt", CSRF_COOKIE = "ge_csrf";
+export function readCookie(req: FastifyRequest, name: string): string | null {
+  for (const part of String(req.headers.cookie ?? "").split(";")) {
+    const i = part.indexOf("=");
+    if (i > 0 && part.slice(0, i).trim() === name) { try { return decodeURIComponent(part.slice(i + 1).trim()); } catch { return null; } }
+  }
+  return null;
+}
+const cookieMode = (req: FastifyRequest) => String(req.headers["x-session-mode"] ?? "").toLowerCase() === "cookie";
+/** maxAge null = a browser-session cookie (gone when the browser closes, like the old tab storage); the server-side expiry still applies */
+function cookie(req: FastifyRequest, name: string, value: string, o: { httpOnly: boolean; path: string; maxAge: number | null }) {
+  const secure = config.secureCookies === "on" || (config.secureCookies === "auto" && req.protocol === "https");
+  return `${name}=${encodeURIComponent(value)}; Path=${o.path}${o.maxAge === null ? "" : `; Max-Age=${o.maxAge}`}; SameSite=Strict${o.httpOnly ? "; HttpOnly" : ""}${secure ? "; Secure" : ""}`;
+}
+/** sets the cookies in cookie mode and returns the body to send */
+export function deliverTokens<B extends { refreshToken: string }>(req: FastifyRequest, reply: FastifyReply, body: B): B | Omit<B, "refreshToken"> {
+  if (!cookieMode(req)) return body;
+  const { refreshToken, ...rest } = body;
+  reply.header("set-cookie", [
+    cookie(req, RT_COOKIE, refreshToken, { httpOnly: true, path: "/api/v1/auth", maxAge: null }),
+    cookie(req, CSRF_COOKIE, newOpaqueToken(), { httpOnly: false, path: "/", maxAge: null }),
+  ]);
+  return { ...rest, cookieSession: true } as any;
+}
+function clearCookies(req: FastifyRequest, reply: FastifyReply) {
+  reply.header("set-cookie", [cookie(req, RT_COOKIE, "", { httpOnly: true, path: "/api/v1/auth", maxAge: 0 }), cookie(req, CSRF_COOKIE, "", { httpOnly: false, path: "/", maxAge: 0 })]);
+}
+/** two tabs refreshing with the same cookie at once: the loser is told to retry instead of being treated as token theft */
+const RACE_GRACE_MS = 20_000;
 const LOCK_MINUTES = 15;
 
 async function issueTokens(db: Db, req: FastifyRequest, tenantId: string, userId: string, familyId = randomUUID()) {
@@ -29,7 +64,7 @@ export async function authRoutes(app: FastifyInstance) {
     schema: { ...T, security: [], summary: "Tenant user login (company code + username or e-mail + password [+ TOTP])",
       body: { type: "object", required: ["tenant", "password"], properties: { tenant: { type: "string" }, login: { type: "string" }, username: { type: "string" }, email: { type: "string" }, password: { type: "string" }, otp: { type: "string" } } } },
     config: { rateLimit: { max: config.loginRateLimitPerMin, timeWindow: "1 minute" } },
-  }, async (req) => {
+  }, async (req, reply) => {
     const raw = parse(z.object({ tenant: z.string().min(3).max(40), login: z.string().min(1).max(254).optional(), username: z.string().min(1).max(254).optional(), email: z.string().min(1).max(254).optional(),
       password: z.string().min(1).max(200), otp: z.string().optional() }).refine((x) => !!(x.login ?? x.username ?? x.email), { message: "username or email required", path: ["login"] }), req.body);
     // one identifier: an e-mail if it has "@", otherwise the username (both case-insensitive)
@@ -62,6 +97,7 @@ export async function authRoutes(app: FastifyInstance) {
         return { err: E.invalidCredentials() };
       }
       if (u.mfa_enabled && !(b.otp && verifyTotp(u.mfa_secret, b.otp))) { await log(false, b.otp ? "bad_otp" : "mfa_required"); return { err: E.mfaRequired() }; }
+      if (u.mfa_secret && !isEncrypted(u.mfa_secret)) await db.query("UPDATE users SET mfa_secret = $2 WHERE id = $1", [u.id, encryptSecret(u.mfa_secret)]);   // secret saved before 0.9
       await db.query("UPDATE users SET failed_logins = 0, locked_until = NULL, last_login_at = now() WHERE id = $1", [u.id]);
       await log(true, null);
       await audit(db, { tenantId: tenant.id, actorType: "user", actorId: u.id, action: "user.login", entityType: "user", entityId: u.id, ip: req.ip, requestId: req.id });
@@ -69,16 +105,26 @@ export async function authRoutes(app: FastifyInstance) {
       return { ok: { ...tokens, refreshId: undefined, mfaSetupRequired: u.mfa_required && !u.mfa_enabled, user: { id: u.id, fullName: u.full_name, email: u.email, username: u.username, locale: u.locale } } };
     });
     if ("err" in outcome) throw outcome.err;
-    return outcome.ok;
+    return deliverTokens(req, reply, outcome.ok);
   });
 
-  app.post("/refresh", { schema: { ...T, security: [], summary: "Rotate refresh token (reuse of a rotated token revokes the whole session family)" } }, async (req) => {
-    const b = parse(z.object({ refreshToken: z.string().regex(/^[0-9a-f-]{36}\.[A-Za-z0-9_-]{20,}$/) }), req.body);
+  app.post("/refresh", { schema: { ...T, security: [], summary: "Rotate refresh token (reuse of a rotated token revokes the whole session family). Body token, or the httpOnly cookie + X-CSRF-Token" } }, async (req, reply) => {
+    const body = (req.body ?? {}) as { refreshToken?: unknown };
+    let token = body.refreshToken;
+    const fromCookie = token === undefined;
+    if (fromCookie) {
+      token = readCookie(req, RT_COOKIE);
+      const csrf = readCookie(req, CSRF_COOKIE);
+      if (!token) throw E.unauthenticated();
+      if (!csrf || req.headers["x-csrf-token"] !== csrf) throw E.forbidden("csrf");
+    }
+    const b = parse(z.object({ refreshToken: z.string().regex(/^[0-9a-f-]{36}\.[A-Za-z0-9_-]{20,}$/) }), { refreshToken: token });
     const [tenantId, raw] = b.refreshToken.split(".");
     const out = await withTenant(tenantId, null, async (db) => {
       const t = (await db.query("SELECT rt.*, u.is_active FROM refresh_tokens rt JOIN users u ON u.id = rt.user_id WHERE token_hash = $1 FOR UPDATE OF rt", [sha256(raw)])).rows[0];
       if (!t) return { err: E.unauthenticated() };
       if (t.revoked_at) {
+        if (fromCookie && t.replaced_by && Date.now() - new Date(t.revoked_at).getTime() < RACE_GRACE_MS) return { err: E.rule("REFRESH_RACE", "أعد المحاولة", "Refreshed by another tab — retry") };
         await db.query("UPDATE refresh_tokens SET revoked_at = coalesce(revoked_at, now()) WHERE family_id = $1", [t.family_id]);
         await audit(db, { tenantId, actorType: "system", actorId: null, action: "auth.refresh_reuse_detected", entityType: "user", entityId: t.user_id, ip: req.ip, requestId: req.id });
         return { err: E.unauthenticated() };
@@ -90,15 +136,16 @@ export async function authRoutes(app: FastifyInstance) {
       await db.query("UPDATE refresh_tokens SET revoked_at = now(), replaced_by = $2 WHERE id = $1", [t.id, tokens.refreshId]);
       return { ok: { ...tokens, refreshId: undefined } };
     }).catch((e) => { if (e?.code === "22P02") return { err: E.unauthenticated() }; throw e; });
-    if ("err" in out) throw out.err;
-    return out.ok;
+    if ("err" in out) { if (fromCookie && (out.err as any).code !== "REFRESH_RACE") clearCookies(req, reply); throw out.err; }
+    return deliverTokens(req, reply, out.ok);
   });
 
   await app.register(async (p) => {
     p.addHook("preHandler", authenticateUser);
 
-    p.post("/logout", { schema: { ...T, summary: "Revoke all sessions of the current user" } }, async (req) => {
+    p.post("/logout", { schema: { ...T, summary: "Revoke all sessions of the current user" } }, async (req, reply) => {
       await withTenant(req.user!.tenantId, req.user!.userId, (db) => db.query("UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL", [req.user!.userId]));
+      clearCookies(req, reply);
       return { ok: true };
     });
 
@@ -132,7 +179,7 @@ export async function authRoutes(app: FastifyInstance) {
       const u = req.user!;
       const secret = newTotpSecret();
       const email = await withTenant(u.tenantId, u.userId, async (db) => {
-        const r = (await db.query("UPDATE users SET mfa_secret = $2 WHERE id = $1 AND NOT mfa_enabled RETURNING coalesce(email::text, username::text) AS email", [u.userId, secret])).rows[0];
+        const r = (await db.query("UPDATE users SET mfa_secret = $2 WHERE id = $1 AND NOT mfa_enabled RETURNING coalesce(email::text, username::text) AS email", [u.userId, encryptSecret(secret)])).rows[0];
         if (!r) throw E.conflict("التحقق الثنائي مفعّل مسبقًا", "MFA already enabled");
         return r.email;
       });

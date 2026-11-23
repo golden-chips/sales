@@ -87,6 +87,14 @@ describe("pay engine", () => {
     });
     // earned = 1350 + 150 = 1500; statutory 3.75% × 1350 = 50.625; loan 100; shortage capped to the rest
     expect([p.earned, p.statutoryDeductions, p.loanRecovery, p.shortageRecovery, p.net]).toEqual(["1500.000", "50.625", "100.000", "1349.375", "0.000"]);
+    // K27: earnings (1350) smaller than the deductions (1000 + 500 + 3.75%): every deduction line is cut in proportion
+    const small = run(full, { components: [{ id: "A", kind: "deduction", method: "fixed", value: "1000" }, { id: "B", kind: "deduction", method: "fixed", value: "500" },
+      { id: "C", kind: "deduction", method: "percent_of_basic", value: "3.75" }] });
+    const lines = small.items.filter((x) => x.kind === "deduction").map((x) => x.amount);
+    expect(small.statutoryDeductions).toBe("1350.000");
+    expect(small.net).toBe("0.000");
+    expect(lines.reduce((a, x) => a + Number(x), 0).toFixed(3)).toBe("1350.000");   // the lines add up to what was withheld
+    expect(lines).toEqual(["870.617", "435.308", "44.075"]);                         // 1350 × 1000 / 1550.625, 1350 × 500 / 1550.625, the rest
     const ot = run((d) => (d === "2026-03-02" ? ["08:00", "18:00"] : full(d)), {}, { "2026-03-02": ["approve_overtime"] });
     expect([ot.overtimeMinutes, ot.overtimePay]).toEqual([120, "18.750"]);   // 120 × 0.104166… × 1.5
   });

@@ -219,8 +219,13 @@ export async function submitSettlement(db: Db, u: UserCtx, b: { settlementDate: 
 export async function getSettlement(db: Db, id: string) {
   const s = await one(db, "SELECT s.*, r.code AS rep_code FROM van_settlements s JOIN sales_reps r ON r.id = s.rep_id WHERE s.id = $1", [id]);
   if (!s) throw E.notFound("van settlement");
-  const lines = (await db.query(`SELECT l.*, (l.counted_qty - l.book_qty) AS diff, i.code AS item_code, i.name_ar AS item_name_ar FROM van_settlement_lines l
+  const lines = (await db.query(`SELECT l.*, (l.counted_qty - l.book_qty) AS diff, i.code AS item_code, i.name_ar AS item_name_ar, i.track_lots FROM van_settlement_lines l
      JOIN items i ON i.id = l.item_id WHERE l.settlement_id = $1 ORDER BY i.code`, [id])).rows;
+  // lot-tracked items counted above the book: the lots this van has held, newest first (the supervisor picks one on approval)
+  for (const l of lines) if (l.track_lots && Number(l.diff) > 0) {
+    l.lot_options = (await db.query(`SELECT lt.id, lt.lot_no, lt.expiry_date, max(m.id) AS last_move FROM stock_moves m JOIN lots lt ON lt.id = m.lot_id
+        WHERE m.warehouse_id = (SELECT van_warehouse_id FROM sales_reps WHERE id = $1) AND m.item_id = $2 GROUP BY lt.id ORDER BY last_move DESC LIMIT 20`, [s.rep_id, l.item_id])).rows;
+  }
   return { ...s, lines, custody: await custodyBalance(db, s.rep_id) };
 }
 
@@ -230,7 +235,8 @@ export async function getSettlement(db: Db, id: string) {
  *   shortage → stock out at average cost, charged to the rep (Dr employee_advances / Cr van inventory)
  *   overage  → stock in at average cost (Dr van inventory / Cr inventory_adjustment)
  */
-export async function approveSettlement(db: Db, u: UserCtx, id: string) {
+export async function approveSettlement(db: Db, u: UserCtx, id: string, opts: { lots?: { itemId: string; lotId: string }[] } = {}) {
+  const chosen = new Map((opts.lots ?? []).map((x) => [x.itemId, x.lotId]));
   const s = await one(db, "SELECT s.*, r.user_id, r.van_warehouse_id FROM van_settlements s JOIN sales_reps r ON r.id = s.rep_id WHERE s.id = $1 FOR UPDATE OF s", [id]);
   if (!s) throw E.notFound("van settlement");
   if (s.status !== "submitted") throw E.rule("ALREADY_PROCESSED", "تمت معالجة التسوية مسبقًا", "Settlement already processed");
@@ -250,9 +256,17 @@ export async function approveSettlement(db: Db, u: UserCtx, id: string) {
       const avg = await one(db, `SELECT CASE WHEN sum(qty) > 0 THEN sum(value) / sum(qty) ELSE 0 END AS c FROM stock_balances WHERE item_id = $1`, [l.item_id]);
       let lotId: string | null = null;
       if (l.track_lots) {
-        const lot = await one(db, `SELECT lot_id FROM stock_moves WHERE warehouse_id = $1 AND item_id = $2 AND lot_id IS NOT NULL ORDER BY id DESC LIMIT 1`, [s.van_warehouse_id, l.item_id]);
-        if (!lot) throw E.rule("LOT_UNKNOWN", `لا يمكن تحديد تشغيلة الزيادة للصنف ${l.code}`, `Cannot determine the lot for the overage of ${l.code}`);
-        lotId = lot.lot_id;
+        if (chosen.has(l.item_id)) {
+          // the supervisor's choice (K23) — must be a lot of this item
+          const lot = await one(db, "SELECT id FROM lots WHERE id = $1 AND item_id = $2", [chosen.get(l.item_id), l.item_id]);
+          if (!lot) throw E.rule("LOT_MISMATCH", `التشغيلة المختارة لا تخص الصنف ${l.code}`, `The chosen lot is not a lot of ${l.code}`);
+          lotId = lot.id;
+        } else {
+          // default: the lot most recently moved in this van
+          const lot = await one(db, `SELECT lot_id FROM stock_moves WHERE warehouse_id = $1 AND item_id = $2 AND lot_id IS NOT NULL ORDER BY id DESC LIMIT 1`, [s.van_warehouse_id, l.item_id]);
+          if (!lot) throw E.rule("LOT_UNKNOWN", `لا يمكن تحديد تشغيلة الزيادة للصنف ${l.code} — اختر التشغيلة`, `Cannot determine the lot for the overage of ${l.code} — choose the lot`);
+          lotId = lot.lot_id;
+        }
       }
       const value = (await one(db, "SELECT round($1::numeric * $2::numeric, $3)::text AS v", [diff, avg.c, m])).v;
       const v = await stockIn(db, u, { ...src, warehouseId: s.van_warehouse_id, itemId: l.item_id, lotId, qty: diff, value });

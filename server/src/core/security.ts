@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
 import { generateSecret, generateURI, verifySync } from "otplib";
 import { config } from "../config.js";
 
@@ -42,10 +42,39 @@ export function verifyPlatform(token: string): PlatformClaims | null {
 export const newOpaqueToken = () => randomBytes(32).toString("base64url");
 export const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
+// ------------------------------------------------------------------ secrets at rest (K3)
+// AES-256-GCM. Stored as "enc1:<iv>:<tag>:<ciphertext>" (base64url). Values written before 0.9 are
+// plain text and are still read; they are re-encrypted the next time they are used.
+let dataKey: Buffer | null = null;
+const key = () => (dataKey ??= config.dataEncryptionKey
+  ? createHash("sha256").update(config.dataEncryptionKey).digest()
+  : Buffer.from(hkdfSync("sha256", config.jwtSecret, "golden-erp", "data-encryption-v1", 32)));
+export const isEncrypted = (v: string | null | undefined) => !!v && v.startsWith("enc1:");
+export function encryptSecret(plain: string): string {
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", key(), iv);
+  const ct = Buffer.concat([c.update(plain, "utf8"), c.final()]);
+  return `enc1:${iv.toString("base64url")}:${c.getAuthTag().toString("base64url")}:${ct.toString("base64url")}`;
+}
+/** null when the value cannot be decrypted (wrong key / tampered) */
+export function decryptSecret(v: string | null | undefined): string | null {
+  if (!v) return null;
+  if (!isEncrypted(v)) return v;
+  const [, iv, tag, ct] = v.split(":");
+  try {
+    const d = createDecipheriv("aes-256-gcm", key(), Buffer.from(iv, "base64url"));
+    d.setAuthTag(Buffer.from(tag, "base64url"));
+    return Buffer.concat([d.update(Buffer.from(ct, "base64url")), d.final()]).toString("utf8");
+  } catch { return null; }
+}
+
 export const newTotpSecret = () => generateSecret();
 export const totpUri = (secret: string, label: string) => generateURI({ issuer: "GOLDEN ERP", label, secret });
-export function verifyTotp(secret: string, token: string): boolean {
+/** `secret` may be stored encrypted or (before 0.9) in plain text */
+export function verifyTotp(stored: string, token: string): boolean {
   if (!/^\d{6}$/.test(token)) return false;
+  const secret = decryptSecret(stored);
+  if (!secret) return false;
   try { return verifySync({ secret, token, epochTolerance: 30 }).valid; } catch { return false; }
 }
 

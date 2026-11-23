@@ -20,6 +20,7 @@ export const E = {
   tenantSuspended: (status: string) => new AppError(403, "TENANT_SUSPENDED", "حساب الشركة موقوف — تواصل مع إدارة المنصة", "Company account is not active", { status }),
   moduleNotInPlan: (m: string) => new AppError(402, "MODULE_NOT_IN_PLAN", "هذه الوحدة غير مشمولة في باقة الاشتراك", "Module not included in subscription plan", { module: m }),
   planLimit: (what: string, limit: number) => new AppError(402, "PLAN_LIMIT_REACHED", `تم بلوغ الحد الأقصى المسموح في الباقة (${what}: ${limit})`, `Plan limit reached (${what}: ${limit})`, { what, limit }),
+  tenantRateLimited: (rpm: number) => new AppError(429, "TENANT_RATE_LIMITED", `تجاوزت الشركة حد الطلبات في الدقيقة حسب الباقة (${rpm}) — انتظر ثوانيَ`, `Company request limit per minute reached (${rpm})`, { rpm }),
   notFound: (what: string) => new AppError(404, "NOT_FOUND", "العنصر غير موجود", `${what} not found`),
   conflict: (msgAr: string, msgEn: string, details?: unknown) => new AppError(409, "CONFLICT", msgAr, msgEn, details),
   validation: (details: unknown) => new AppError(422, "VALIDATION_FAILED", "البيانات المدخلة غير صحيحة", "Validation failed", details),
