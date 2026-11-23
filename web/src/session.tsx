@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, getSession, setSession } from "./api";
+import { api, ApiError, getSession, setSession } from "./api";
 
 export interface Me {
   user: { id: string; email: string | null; username: string | null; full_name: string; locale: string; is_owner: boolean; mfa_enabled: boolean };
@@ -16,12 +16,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [companyId, setCompanyIdState] = useState<string | null>(() => { try { return localStorage.getItem("ge.company"); } catch { return null; } });
   const load = async () => {
     if (!getSession("tenant")) { setMe(null); setLoading(false); return; }
-    try {
-      const m = await api.get<Me>("/auth/me");
+    const apply = (m: Me) => {
       setMe(m);
       if (!m.companies.find((c) => c.id === companyId)) setCompanyIdState(m.companies[0]?.id ?? null);
-      if (m.tenant.brand_color) document.documentElement.style.setProperty("--brand", m.tenant.brand_color);
-    } catch { setSession("tenant", null); setMe(null); } finally { setLoading(false); }
+      // the company colour is the default theme only; a colour theme the user picked wins
+      const accent = document.documentElement.getAttribute("data-accent");
+      if (m.tenant.brand_color && (!accent || accent === "gold")) document.documentElement.style.setProperty("--brand", m.tenant.brand_color);
+    };
+    try {
+      const m = await api.get<Me>("/auth/me");
+      apply(m);
+      try { localStorage.setItem("ge.me", JSON.stringify(m)); } catch { /* offline copy is optional */ }
+    } catch (e) {
+      // no connection (or the server is restarting): keep the session and open with the last profile seen on this
+      // device, so the POS and rep app keep working offline. Only a real rejection by the server signs out.
+      let cached: string | null = null;
+      try { cached = localStorage.getItem("ge.me"); } catch { cached = null; }
+      const network = !(e instanceof ApiError) || e.status === 0 || e.status >= 502;
+      if (network && cached) apply(JSON.parse(cached));
+      else { setSession("tenant", null); setMe(null); }
+    } finally { setLoading(false); }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
   useEffect(() => {
@@ -34,7 +48,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={{
       me, loading, companyId, setCompanyId, can: (p) => !!me?.permissions.includes(p),
       signIn: async (s) => { setSession("tenant", s); setLoading(true); await load(); },
-      signOut: () => { api.post("/auth/logout").catch(() => undefined).finally(() => { setSession("tenant", null); setMe(null); }); },
+      signOut: () => { try { localStorage.removeItem("ge.me"); } catch { /* nothing cached */ } api.post("/auth/logout").catch(() => undefined).finally(() => { setSession("tenant", null); setMe(null); }); },
     }}>{children}</Ctx.Provider>
   );
 }

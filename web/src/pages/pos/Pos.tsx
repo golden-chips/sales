@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Banknote, Check, CreditCard, Landmark, Minus, Plus, Printer, Smartphone, UserRound } from "lucide-react";
-import { api, fmt, fmtDateTime } from "../../api";
+import { api, ApiError, fmt, fmtDateTime } from "../../api";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
 import { Empty, ErrorBox, Field, Loading, Modal, StatusBadge, errMsg, useAsync, useToast } from "../../ui";
@@ -10,12 +10,32 @@ import { LinesTable, today } from "../erp/shared";
 type CartLine = { key: string; itemId: string; uomId: string | null; label: string; unitPrice: number; factor: number; qty: number; discountPct: number };
 const uuid = () => (crypto as any).randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
+// ================================================================== offline (K33)
+// When the network drops the cashier keeps selling: the sale is kept on this device and sent
+// when the connection returns. The server never records it twice (same clientId).
+type Queued = { clientId: string; shiftId: string; body: any; total: number; createdAt: string; status: "pending" | "failed"; error?: string };
+const QKEY = "ge.pos.queue";
+const loadQueue = (): Queued[] => { try { return JSON.parse(localStorage.getItem(QKEY) || "[]"); } catch { return []; } };
+const saveQueue = (q: Queued[]) => { try { localStorage.setItem(QKEY, JSON.stringify(q)); } catch { /* storage blocked: queue lives in memory for this tab */ } };
+const isNetworkError = (e: unknown) => !(e instanceof ApiError) || (e as ApiError).status === 0 || (e as ApiError).status >= 502;
+/** cached read: the last good answer is kept per device so the counter opens without a connection */
+async function cachedGet(path: string, key: string) {
+  try { const r = await api.get(path); try { localStorage.setItem(key, JSON.stringify(r)); } catch { /* cache is optional */ } return r; }
+  catch (e) {
+    if (!isNetworkError(e)) throw e;
+    let cached: string | null = null;
+    try { cached = localStorage.getItem(key); } catch { cached = null; }
+    if (cached) return JSON.parse(cached);
+    throw e;
+  }
+}
+
 // ================================================================== counter
 export function PosCounter() {
   const { tt, lang } = useI18n();
   const { companyId } = useSession();
   const { toast } = useToast();
-  const current = useAsync(() => api.get("/pos/shifts/current"), []);
+  const current = useAsync(() => cachedGet("/pos/shifts/current", "ge.pos.shift"), []);
   const registers = useAsync(() => api.get(`/pos/registers?companyId=${companyId}`), [companyId]);
   const [reg, setReg] = useState("");
   const [float, setFloat] = useState("0");
@@ -49,12 +69,48 @@ function Counter({ report, reload }: { report: any; reload: () => void }) {
   const { toast } = useToast();
   const shift = report.shift;
   const [q, setQ] = useState("");
-  const catalog = useAsync(() => api.get(`/pos/registers/${shift.register_id}/catalog${q && q.length > 1 ? `?q=${encodeURIComponent(q)}` : ""}`), [shift.register_id, q]);
+  // the full catalog is cached for offline use; searching filters it locally when there is no connection
+  const fullCatalog = useAsync(() => cachedGet(`/pos/registers/${shift.register_id}/catalog`, `ge.pos.catalog.${shift.register_id}`), [shift.register_id]);
+  const catalog = useMemo(() => {
+    const all: any[] = fullCatalog.data ?? [];
+    const n = q.trim().toLowerCase();
+    return { data: n.length > 1 ? all.filter((i) => `${i.name_ar} ${i.code} ${i.barcode ?? ""}`.toLowerCase().includes(n)) : all, error: fullCatalog.error };
+  }, [fullCatalog.data, fullCatalog.error, q]);
+  const [queue, setQueue] = useState<Queued[]>(loadQueue);
+  const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  const [syncing, setSyncing] = useState(false);
+  const mine = queue.filter((x) => x.shiftId === shift.id);
+  const pending = mine.filter((x) => x.status === "pending"), failed = mine.filter((x) => x.status === "failed");
+  const updateQueue = (f: (q: Queued[]) => Queued[]) => setQueue((q) => { const n = f(q); saveQueue(n); return n; });
+  const sync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    let sent = 0;
+    for (const item of loadQueue().filter((x) => x.status === "pending" && x.shiftId === shift.id)) {
+      try { await api.post(`/pos/shifts/${item.shiftId}/sales`, item.body); sent++; updateQueue((q) => q.filter((x) => x.clientId !== item.clientId)); }
+      catch (e) {
+        if (isNetworkError(e)) break;   // still offline: try again later
+        updateQueue((q) => q.map((x) => x.clientId === item.clientId ? { ...x, status: "failed", error: errMsg(e, lang) } : x));
+      }
+    }
+    setSyncing(false);
+    if (sent) { toast(tt(`أُرسلت ${sent} عملية بيع حُفظت بدون اتصال`, `${sent} offline sales sent`)); reload(); }
+  };
+  useEffect(() => {
+    const on = () => { setOnline(true); sync(); }, off = () => setOnline(false);
+    window.addEventListener("online", on); window.addEventListener("offline", off);
+    const t = setInterval(() => { if (navigator.onLine && loadQueue().some((x) => x.status === "pending")) sync(); }, 30000);
+    if (navigator.onLine && pending.length) sync();
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); clearInterval(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shift.id]);
+  const enqueue = (item: Queued) => updateQueue((q) => [...q, item]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paying, setPaying] = useState(false);
   const [receipt, setReceipt] = useState<any | null>(null);
   const [closing, setClosing] = useState(false);
   const [returning, setReturning] = useState(false);
+  const [showFailed, setShowFailed] = useState(false);
   const scan = useRef<HTMLInputElement>(null);
   const lineTotal = (l: CartLine) => Math.round(l.qty * l.unitPrice * l.factor * (1 - l.discountPct / 100) * 1000) / 1000;
   const total = useMemo(() => Math.round(cart.reduce((s, l) => s + lineTotal(l), 0) * 1000) / 1000, [cart]);
@@ -81,9 +137,13 @@ function Counter({ report, reload }: { report: any; reload: () => void }) {
   return <>
     <div className="page-head"><h1>{tt("نقطة البيع", "Point of sale")} · {shift.register_code}</h1><div className="row">
       <span className="badge">{shift.number}</span>
+      {!online && <span className="badge bad">{tt("بدون اتصال — البيع مستمر", "Offline — selling continues")}</span>}
+      {pending.length > 0 && <button className="badge warn" style={{ border: 0, cursor: "pointer" }} onClick={() => sync()} disabled={syncing}>
+        {syncing ? tt("جارٍ الإرسال…", "Sending…") : tt(`${pending.length} عملية بانتظار الإرسال — اضغط للإرسال`, `${pending.length} waiting — tap to send`)}</button>}
+      {failed.length > 0 && <button className="badge bad" style={{ border: 0, cursor: "pointer" }} onClick={() => setShowFailed(true)}>{tt(`${failed.length} عملية رُفضت عند الإرسال`, `${failed.length} rejected`)}</button>}
       <span className="badge info">{tt("نقدية متوقعة", "Expected cash")}: <span className="num">{fmt(report.expectedCash)}</span></span>
       {can("pos.sales.return") && <button className="btn" onClick={() => setReturning(true)}>{tt("مرتجع", "Return")}</button>}
-      <button className="btn" onClick={() => setClosing(true)}>{tt("إقفال الوردية", "Close shift")}</button></div></div>
+      <button className="btn" onClick={() => mine.length ? toast(tt("أرسل عمليات البيع المحفوظة بدون اتصال أولًا (أو راجع المرفوضة) قبل إقفال الوردية", "Send (or review) the offline sales before closing"), true) : setClosing(true)}>{tt("إقفال الوردية", "Close shift")}</button></div></div>
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 3fr) minmax(280px, 2fr)", gap: 16 }} className="pos-grid">
       <div>
         <input ref={scan} autoFocus placeholder={tt("امسح الباركود أو ابحث بالاسم/الرمز ثم Enter", "Scan a barcode or search, then Enter")} value={q}
@@ -116,7 +176,14 @@ function Counter({ report, reload }: { report: any; reload: () => void }) {
         </div>
       </div>
     </div>
-    {paying && <Pay shiftId={shift.id} cart={cart} estimate={total} methods={report.paymentMethods ?? []} legacyCard={!!report.legacyCard} onClose={() => setPaying(false)} onDone={done} />}
+    {paying && <Pay shiftId={shift.id} cart={cart} estimate={total} methods={report.paymentMethods ?? []} legacyCard={!!report.legacyCard} onClose={() => setPaying(false)} onDone={done} onOffline={enqueue}
+      meta={{ company: report.shift.company_name, register: report.shift.register_name ?? shift.register_code, cashier: report.shift.cashier, shiftNumber: shift.number }} />}
+    {showFailed && <Modal title={tt("عمليات رُفضت عند الإرسال", "Rejected offline sales")} onClose={() => setShowFailed(false)}>
+      <div className="alert warn">{tt("هذه عمليات بيع حُفظت بدون اتصال ورفضها الخادم عند الإرسال (مثلًا الكمية لم تعد متوفرة أو تغيّر السعر). راجعها مع المشرف ثم احذفها من الجهاز.", "Offline sales the server refused (e.g. stock no longer available or price changed). Review with the supervisor, then remove them.")}</div>
+      {failed.map((x) => <div key={x.clientId} className="pay-line"><span className="pl-name">{fmtDateTime(x.createdAt)} · <span className="num">{fmt(String(x.total))}</span><br /><small style={{ color: "var(--bad)" }}>{x.error}</small></span>
+        <button className="btn sm" onClick={() => updateQueue((q) => q.map((y) => y.clientId === x.clientId ? { ...y, status: "pending", error: undefined } : y))}>{tt("إعادة المحاولة", "Retry")}</button>
+        <button className="btn sm danger" onClick={() => updateQueue((q) => q.filter((y) => y.clientId !== x.clientId))}>{tt("حذف", "Remove")}</button></div>)}
+    </Modal>}
     {receipt && <Receipt data={receipt} onClose={() => { setReceipt(null); setTimeout(() => scan.current?.focus(), 50); }} />}
     {closing && <CloseShift report={report} onClose={() => setClosing(false)} onDone={() => { setClosing(false); reload(); }} />}
     {returning && <PosReturn shiftId={shift.id} companyId={companyId ?? ""} onClose={() => { setReturning(false); reload(); }} />}
@@ -128,8 +195,8 @@ const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /** payment: one tap per method (cash, each card/wallet the cashier may take, on account), split allowed,
  *  big "received" box with quick notes, live change / still-due. Enter confirms when fully paid. */
-function Pay({ shiftId, cart, estimate, methods, legacyCard, onClose, onDone }: { shiftId: string; cart: CartLine[]; estimate: number; methods: any[]; legacyCard: boolean;
-  onClose: () => void; onDone: (r: any) => void }) {
+function Pay({ shiftId, cart, estimate, methods, legacyCard, onClose, onDone, onOffline, meta }: { shiftId: string; cart: CartLine[]; estimate: number; methods: any[]; legacyCard: boolean;
+  onClose: () => void; onDone: (r: any) => void; onOffline: (q: Queued) => void; meta: { company?: string; register?: string; cashier?: string; shiftNumber?: string } }) {
   const { t, tt, lang } = useI18n();
   const { can, companyId } = useSession();
   const { toast } = useToast();
@@ -175,11 +242,26 @@ function Pay({ shiftId, cart, estimate, methods, legacyCard, onClose, onDone }: 
     setBusy(true); setErr(null);
     try {
       const sum = (k: PayLine["kind"]) => r3(lines.filter((l) => l.kind === k).reduce((a, l) => a + (Number(l.amount) || 0), 0)).toFixed(3);
-      const r = await api.post(`/pos/shifts/${shiftId}/sales`, { clientId, customerId: customerId || null,
+      const body = { clientId, customerId: customerId || null,
         lines: cart.map((l) => ({ itemId: l.itemId, uomId: l.uomId, qty: String(l.qty), discountPct: String(l.discountPct) })),
         cash: sum("cash"), card: sum("card"), credit: sum("credit"),
         payments: lines.filter((l) => l.kind === "method" && Number(l.amount) > 0).map((l) => ({ methodId: l.methodId, amount: Number(l.amount).toFixed(3) })),
-        tendered: cash > 0 ? got.toFixed(3) : undefined });
+        tendered: cash > 0 ? got.toFixed(3) : undefined };
+      let r;
+      try { r = await api.post(`/pos/shifts/${shiftId}/sales`, body); }
+      catch (e) {
+        if (!isNetworkError(e)) throw e;
+        // no connection: keep the sale on this device and give the customer a provisional receipt
+        if (creditLine) throw new ApiError(0, "OFFLINE_CREDIT", "Selling on account needs a connection", "البيع الآجل يحتاج اتصالًا بالخادم");
+        onOffline({ clientId, shiftId, body, total, createdAt: new Date().toISOString(), status: "pending" });
+        const unit = (l: CartLine) => l.unitPrice * l.factor;
+        r = { offline: true, company_name: meta.company, register_name: meta.register, cashier: meta.cashier, shift_number: meta.shiftNumber, customer_code: "WALKIN",
+          invoice: { number: null, posted_at: new Date().toISOString(), total: String(total), discount_total: "0",
+            lines: cart.map((l) => ({ id: l.key, item_name_ar: l.label, qty: String(l.qty), uom_code: "", unit_price: String(unit(l)), discount_pct: String(l.discountPct),
+              line_total: String(Math.round(l.qty * unit(l) * (1 - l.discountPct / 100) * 1000) / 1000) })) },
+          payments: lines.filter((l) => Number(l.amount) > 0).map((l) => ({ tender: l.kind === "cash" ? "cash" : "card", method: l.kind === "method" ? l.label : undefined, amount: l.amount })),
+          tendered: cash > 0 ? got.toFixed(3) : null, change: cash > 0 ? change.toFixed(3) : "0" };
+      }
       onDone(r);
     } catch (e: any) {
       // the server prices the sale (customer special prices); if it differs, take its total and let the cashier confirm again
@@ -259,7 +341,7 @@ export function Receipt({ data, onClose }: { data: any; onClose: () => void }) {
     const k = (e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); onClose(); } };
     window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
   }, [onClose]);
-  return <Modal title={tt("تم البيع ✓", "Sale complete ✓")} onClose={onClose} footer={<>
+  return <Modal title={data.offline ? tt("تم البيع ✓ (محفوظ بدون اتصال)", "Sale saved offline ✓") : tt("تم البيع ✓", "Sale complete ✓")} onClose={onClose} footer={<>
     <div className="seg" style={{ marginInlineEnd: "auto" }}><button className={format === "roll" ? "on" : ""} onClick={() => choose("roll")}>{tt("إيصال حراري 80مم", "80mm receipt")}</button>
       <button className={format === "a4" ? "on" : ""} onClick={() => choose("a4")}>{tt("فاتورة A4", "A4 invoice")}</button></div>
     <button className="btn" onClick={() => printReceipt(format)}><Printer size={16} />{tt("طباعة", "Print")}</button>
@@ -282,7 +364,7 @@ function ReceiptBody({ data, format }: { data: any; format: PrintFormat }) {
       <div className="rc-title">{format === "a4" ? tt("فاتورة مبيعات", "Sales invoice") : tt("إيصال بيع", "Sales receipt")}</div>
     </div>
     <div className="rc-meta">
-      {row(tt("رقم الفاتورة", "Invoice no."), inv.number)}
+      {row(tt("رقم الفاتورة", "Invoice no."), inv.number ?? tt("يُرقّم عند الاتصال", "numbered when online"))}
       {row(tt("التاريخ", "Date"), fmtDateTime(inv.posted_at))}
       {row(tt("الكاشير", "Cashier"), <span style={{ fontFamily: "inherit" }}>{data.cashier}</span>)}
       {data.customer_code !== "WALKIN" && row(tt("العميل", "Customer"), <span style={{ fontFamily: "inherit" }}>{data.customer_name}</span>)}

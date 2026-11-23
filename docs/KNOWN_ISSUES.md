@@ -36,7 +36,7 @@ Legacy systems findings (V1–V10, H1–H6) are in `PHASE0_DISCOVERY_AUDIT.md`; 
 | K30 | Low | HR engine ports the core حضوري rules; rosters/rotating shifts, multiple sites, coverage pay and supervisor tools from حضوري are not ported yet | Phase 5 remainder |
 | K31 | Medium | Assets: buying an asset on a supplier invoice (asset line in the supplier invoice) is not implemented — capitalization credits bank/cash/opening balance or a non-control liability | Phase 6 remainder |
 | K32 | Low | Assets: revaluation, impairment, units-of-production depreciation, split/merge, inter-company transfer not implemented | Later |
-| K33 | Medium | POS needs a live connection to complete a sale (retries are duplicate-safe via clientId, but there is no offline sales queue like the rep app) | Phase 6 remainder |
+| K33 | ~~Medium~~ **Resolved (0.9)** | POS works offline: the counter opens from the device's last copy (shift, catalog, profile), cash/card sales are kept on the device with a provisional receipt and sent automatically when the connection returns (never twice). Limits: selling on account needs a connection; a sale the server refuses on sync (stock gone, price changed) is listed for the supervisor; the shift cannot be closed while sales are waiting | — |
 | K34 | Low | POS: no direct card-terminal or cash-drawer integration; card amounts are keyed in; printing uses the OS printer (80 mm layout) | Hardware integration |
 | K35 | Low | POS promotions (buy-X-get-Y), loyalty points and gift cards not implemented | Later |
 | K36 | Medium | BI alerts/schedules are queued to the outbox but not delivered (no e-mail/WhatsApp provider configured); periodic evaluation needs a server cron at deployment — today it is triggered from the UI/API | Hosting (D5) |

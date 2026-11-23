@@ -66,6 +66,31 @@ test("purchase order above the threshold: finance manager approves it", async ({
   expect(errs).toEqual([]);
 });
 
+test("point of sale offline: the sale is kept on the device and sent when the connection returns", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  const errs = watchErrors(page);
+  await login(page, "cashier");
+  await page.goto("/pos");
+  const card = page.locator(".card", { hasText: "DEMO-CHIPS-40" }).first();
+  await expect(card).toBeVisible();
+  await page.route("**/api/v1/**", (r) => r.abort("internetdisconnected"));
+  await ctx.setOffline(true);
+  await card.click();
+  await page.keyboard.press("F9");
+  await modal(page).getByRole("button", { name: /^بالضبط/ }).click();
+  await page.keyboard.press("Enter");
+  await expect(modal(page).getByText("محفوظ بدون اتصال")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".page-head")).toContainText("بانتظار الإرسال");
+  await page.unroute("**/api/v1/**");
+  await ctx.setOffline(false);
+  await expectToast(page, "أُرسلت 1");
+  await expect(page.locator(".page-head")).not.toContainText("بانتظار الإرسال");
+  expect(errs).toEqual([]);
+  await ctx.close();
+});
+
 test("point of sale: cashier sells from the open shift and closes it (Z report)", async ({ page }) => {
   const errs = watchErrors(page);
   await login(page, "cashier");
