@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.0 — unreleased — feedback from the first trial
+## 0.9.0 — 2026-11-23 — feedback from the first trial
 ### Added
 - **POS payment screen**: one tap per method (cash, each card / wallet / transfer the cashier may use, on account), split payments, a large "received" box with exact / round-note buttons, live change or still-due, Enter to confirm, F9 to pay, quantity +/− in the cart; when the server's price differs (customer special price) the screen takes the server total and asks to confirm again.
 - **Payment methods** (migration 017): several card / wallet / transfer methods per company, each posting to its own account, optionally limited to named cashiers; Z report splits card takings by method; receipts name the method.

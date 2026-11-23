@@ -5,6 +5,7 @@
 //
 //   node tools/loadtest/pos-rush.mjs http://localhost:4000 <gm-password> [cashiers=10] [salesEach=40] [thinkMs=0]
 // The API must run with LOGIN_RATE_LIMIT_PER_MIN raised (it logs in N+2 users) — test servers only.
+// The company's plan limit (api_rpm) also applies: to measure the server itself run it with TENANT_RATE_LIMIT=off.
 const [base = "http://localhost:4000", pw, nArg = "10", mArg = "40", thinkArg = "0"] = process.argv.slice(2);
 if (!pw) { console.error("usage: pos-rush.mjs <baseUrl> <gm-password> [cashiers] [salesEach]"); process.exit(1); }
 const N = Number(nArg), M = Number(mArg), THINK = Number(thinkArg), TENANT = "demo-foods";   // THINK: ms a cashier spends scanning before the next sale (0 = flat out)
