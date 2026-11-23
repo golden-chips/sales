@@ -7,7 +7,7 @@ import {
   Factory, FlaskConical, CalendarClock, ShieldCheck, Microscope, AlertTriangle, Route, BookCheck, BarChart3, Sparkles, Contact,
   KanbanSquare, Headset, ListTodo, FolderOpen, Stamp, Briefcase, CheckSquare, ScanBarcode, Clock3, Landmark, TrendingDown, Wrench,
   BookOpen, NotebookPen, Calculator, CalendarRange, Rocket, ClipboardCheck, Upload, UserCog, KeyRound, Building2, ScrollText, CreditCard,
-  Settings2, Banknote, CalendarDays, FileSpreadsheet, ClipboardPen, ShoppingBag, SlidersHorizontal, ReceiptText,
+  Settings2, Banknote, CalendarDays, FileSpreadsheet, ClipboardPen, ShoppingBag, SlidersHorizontal, ReceiptText, Container,
 } from "lucide-react";
 
 export interface NavItem { to: string; ar: string; en: string; icon: LucideIcon; module?: string; perm?: string | string[]; any?: boolean }
@@ -53,6 +53,7 @@ export const NAV: NavGroup[] = [
     { to: "/purchasing/orders", ar: "أوامر الشراء", en: "Purchase orders", icon: ShoppingBag, module: "purchasing", perm: ["purchasing.orders.manage", "purchasing.orders.approve"], any: true },
     { to: "/purchasing/receipts", ar: "أذونات الاستلام", en: "Goods receipts", icon: PackageCheck, module: "purchasing", perm: "purchasing.receipts.view" },
     { to: "/purchasing/invoices", ar: "فواتير الموردين", en: "Supplier invoices", icon: Receipt, module: "purchasing", perm: "purchasing.receipts.view" },
+    { to: "/purchasing/landed-costs", ar: "التكاليف الإضافية (شحن وجمارك)", en: "Landed costs", icon: Container, module: "purchasing", perm: "purchasing.receipts.view" },
     { to: "/purchasing/debit-notes", ar: "الإشعارات المدينة", en: "Debit notes", icon: ReceiptText, module: "purchasing", perm: "purchasing.receipts.view" },
     { to: "/suppliers", ar: "الموردون", en: "Suppliers", icon: Building, module: "purchasing", perm: "purchasing.suppliers.view" },
   ] },

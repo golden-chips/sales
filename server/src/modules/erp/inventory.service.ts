@@ -5,7 +5,8 @@ import type { UserCtx } from "../../core/auth.js";
 import { E } from "../../core/errors.js";
 import { audit } from "../../core/audit.js";
 import { ensureLot, stockIn, stockOut } from "./stock.js";
-import { docNumber, inventoryRole, itemUom, lockDraft, markPosted, minorUnits, postJournal, warehouseOf } from "./common.js";
+import { accountByRole, docNumber, inventoryRole, itemUom, lockDraft, markPosted, minorUnits, postAccounts, postJournal, warehouseOf } from "./common.js";
+import { spreadOverReceipt } from "./landed.service.js";
 
 const n = async (db: Db, sql: string, args: unknown[]) => (await db.query(sql, args)).rows[0];
 
@@ -76,12 +77,12 @@ export async function getReceipt(db: Db, id: string) {
 }
 
 // ------------------------------------------------------------------ supplier invoice (matched to a receipt)
-export async function createSupplierInvoice(db: Db, u: UserCtx, b: { receiptId: string; supplierInvoiceNo: string; invoiceDate: string; total: string }) {
+export async function createSupplierInvoice(db: Db, u: UserCtx, b: { receiptId: string; supplierInvoiceNo: string; invoiceDate: string; total: string; isFinal?: boolean }) {
   const r = (await db.query("SELECT * FROM purchase_receipts WHERE id = $1", [b.receiptId])).rows[0];
   if (!r || r.status !== "posted") throw E.rule("RECEIPT_NOT_POSTED", "يجب ترحيل إذن الاستلام أولًا", "The goods receipt must be posted first");
   const x = (await db.query(
-    `INSERT INTO supplier_invoices (tenant_id, company_id, supplier_id, receipt_id, supplier_invoice_no, invoice_date, total, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-    [u.tenantId, r.company_id, r.supplier_id, r.id, b.supplierInvoiceNo, b.invoiceDate, b.total, u.userId])).rows[0];
+    `INSERT INTO supplier_invoices (tenant_id, company_id, supplier_id, receipt_id, supplier_invoice_no, invoice_date, total, is_final, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    [u.tenantId, r.company_id, r.supplier_id, r.id, b.supplierInvoiceNo, b.invoiceDate, b.total, !!b.isFinal, u.userId])).rows[0];
   await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "supplier_invoice.draft_created", entityType: "supplier_invoice", entityId: x.id, after: b });
   return x;
 }
@@ -89,16 +90,30 @@ export async function createSupplierInvoice(db: Db, u: UserCtx, b: { receiptId: 
 export async function postSupplierInvoice(db: Db, u: UserCtx, id: string) {
   const d = await lockDraft(db, u, "supplier_invoices", id);
   const r = (await db.query("SELECT * FROM purchase_receipts WHERE id = $1 FOR UPDATE", [d.receipt_id])).rows[0];
-  if ((await n(db, "SELECT $1::numeric > ($2::numeric - $3::numeric) AS over", [d.total, r.total, r.amount_invoiced])).over)
-    throw E.rule("INVOICE_EXCEEDS_RECEIPT", `قيمة فاتورة المورد تتجاوز المتبقي غير المفوتر من الاستلام (${r.total} − ${r.amount_invoiced})`,
-      "Supplier invoice exceeds the receipt's uninvoiced value (price variances are not supported yet)", { receiptTotal: r.total, invoiced: r.amount_invoiced });
-  await db.query("UPDATE purchase_receipts SET amount_invoiced = amount_invoiced + $2 WHERE id = $1", [r.id, d.total]);
+  const remaining = (await n(db, "SELECT ($1::numeric - $2::numeric)::text AS r", [r.total, r.amount_invoiced])).r;
+  // a final invoice closes the receipt: any difference from the received value is the purchase price variance (K14)
+  let variance = "0";
+  if (d.is_final) {
+    if (Number(remaining) <= 0) throw E.rule("RECEIPT_FULLY_INVOICED", "الاستلام مفوتر بالكامل", "The receipt is already fully invoiced");
+    variance = (await n(db, "SELECT ($1::numeric - $2::numeric)::text AS v", [d.total, remaining])).v;
+    await db.query("UPDATE purchase_receipts SET amount_invoiced = total WHERE id = $1", [r.id]);
+  } else {
+    if ((await n(db, "SELECT $1::numeric > $2::numeric AS over", [d.total, remaining])).over)
+      throw E.rule("INVOICE_EXCEEDS_RECEIPT", `قيمة فاتورة المورد تتجاوز المتبقي غير المفوتر من الاستلام (${remaining}) — إن كان السعر تغيّر فعلِّم الفاتورة «نهائية» ليُحتسب فرق السعر`,
+        "Supplier invoice exceeds the receipt's uninvoiced value — mark it final to book the price variance", { receiptTotal: r.total, invoiced: r.amount_invoiced });
+    await db.query("UPDATE purchase_receipts SET amount_invoiced = amount_invoiced + $2 WHERE id = $1", [r.id, d.total]);
+  }
   const terms = (await n(db, "SELECT payment_terms_days FROM parties WHERE id = $1", [d.supplier_id])).payment_terms_days;
   const due = (await n(db, "SELECT ($1::date + $2::int)::text AS d", [d.invoice_date, terms])).d;
   const number = await docNumber(db, u, d.company_id, "PI", d.invoice_date);
-  const je = await postJournal(db, u, { companyId: d.company_id, date: d.invoice_date, memo: `فاتورة مورد ${d.supplier_invoice_no} (${number})`, sourceType: "supplier_invoice", sourceId: id,
-    parts: [{ role: "grni", amount: d.total }, { role: "ap", amount: "-" + d.total }] });
-  await markPosted(db, u, "supplier_invoices", id, number, je, { due_date: due });
+  const date = String(d.invoice_date).slice(0, 10);
+  const grni = d.is_final ? remaining : d.total;
+  const sp = Number(variance) !== 0
+    ? await spreadOverReceipt(db, u, { companyId: d.company_id, date, receiptId: r.id, amount: variance, split: "value", sourceType: "supplier_invoice", sourceId: id })
+    : { parts: [] as { accountId: string; amount: string }[] };
+  const je = await postAccounts(db, u, { companyId: d.company_id, date, memo: `فاتورة مورد ${d.supplier_invoice_no} (${number})${Number(variance) ? ` — فرق سعر ${variance}` : ""}`, sourceType: "supplier_invoice", sourceId: id,
+    parts: [{ accountId: await accountByRole(db, d.company_id, "grni"), amount: grni }, ...sp.parts, { accountId: await accountByRole(db, d.company_id, "ap"), amount: "-" + d.total }] });
+  await markPosted(db, u, "supplier_invoices", id, number, je, { due_date: due, price_variance: variance });
   await audit(db, { tenantId: u.tenantId, actorType: "user", actorId: u.userId, action: "supplier_invoice.posted", entityType: "supplier_invoice", entityId: id, after: { number, total: d.total } });
   return (await db.query("SELECT * FROM supplier_invoices WHERE id = $1", [id])).rows[0];
 }

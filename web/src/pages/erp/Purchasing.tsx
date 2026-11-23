@@ -11,14 +11,7 @@ export default function PurchaseReceipts() {
   const { toast } = useToast();
   const [editor, setEditor] = useState(false);
   const [k, setK] = useState(0);
-  const invoice = async (d: any) => {
-    const no = prompt(tt("رقم فاتورة المورد", "Supplier invoice number"));
-    if (!no) return;
-    const total = prompt(tt("قيمة الفاتورة", "Invoice total"), String(Number(d.total) - Number(d.amount_invoiced)));
-    if (!total) return;
-    try { await api.post("/purchasing/invoices", { receiptId: d.id, supplierInvoiceNo: no, invoiceDate: today(), total }); toast(tt("حُفظت فاتورة المورد كمسودة", "Supplier invoice saved as draft")); }
-    catch (e) { toast(errMsg(e, lang), true); }
-  };
+  const [invoicing, setInvoicing] = useState<any | null>(null);
   return <>
     <DocList path="/purchasing/receipts" title={tt("أذونات الاستلام", "Goods receipts")} newLabel={tt("استلام جديد", "New receipt")} onNew={() => setEditor(true)} reloadKey={k}
       createPerm="purchasing.receipts.create" postPerm="purchasing.receipts.post"
@@ -29,10 +22,91 @@ export default function PurchaseReceipts() {
         <LinesTable rows={d.lines} cols={[{ h: tt("الصنف", "Item"), v: (l) => `${l.item_code} ${l.item_name_ar}` }, { h: tt("الكمية", "Qty"), v: (l) => `${Number(l.qty)} ${l.uom_code}` },
           { h: tt("التكلفة", "Cost"), v: (l) => money(l.unit_cost), end: true }, { h: tt("التشغيلة", "Lot"), v: (l) => l.lot_no ?? "" }, { h: tt("الانتهاء", "Expiry"), v: (l) => l.expiry_date ?? "" },
           { h: t.total, v: (l) => money(l.line_total), end: true }]} />
-        {d.status === "posted" && Number(d.amount_invoiced) < Number(d.total) && can("purchasing.invoices.create") && <button className="btn" onClick={() => invoice(d)}>{tt("تسجيل فاتورة المورد", "Record supplier invoice")}</button>}
+        {d.status === "posted" && Number(d.amount_invoiced) < Number(d.total) && can("purchasing.invoices.create") && <button className="btn" onClick={() => setInvoicing(d)}>{tt("تسجيل فاتورة المورد", "Record supplier invoice")}</button>}
       </>} />
     {editor && <ReceiptEditor onClose={() => setEditor(false)} onSaved={() => { setEditor(false); setK(k + 1); }} />}
+    {invoicing && <SupplierInvoiceEditor receipt={invoicing} onClose={() => setInvoicing(null)} onSaved={() => { setInvoicing(null); toast(tt("حُفظت فاتورة المورد كمسودة", "Supplier invoice saved as draft")); setK(k + 1); }} />}
   </>;
+}
+
+/** supplier invoice for a posted receipt; "final" closes the receipt and books any price difference */
+function SupplierInvoiceEditor({ receipt, onClose, onSaved }: { receipt: any; onClose: () => void; onSaved: () => void }) {
+  const { t, tt } = useI18n();
+  const remaining = Number(receipt.total) - Number(receipt.amount_invoiced);
+  const [f, setF] = useState({ no: "", total: String(remaining), date: today(), isFinal: true });
+  const [key] = useState(() => crypto.randomUUID());
+  const [err, setErr] = useState<unknown>(null);
+  const diff = Number(f.total || 0) - remaining;
+  const save = async () => {
+    setErr(null);
+    try { await api.post("/purchasing/invoices", { receiptId: receipt.id, supplierInvoiceNo: f.no, invoiceDate: f.date, total: f.total, isFinal: f.isFinal }, { idempotencyKey: key }); onSaved(); }
+    catch (e) { setErr(e); }
+  };
+  return <Modal title={`${tt("فاتورة المورد على الاستلام", "Supplier invoice for receipt")} ${receipt.number}`} onClose={onClose}
+    footer={<><button className="btn" onClick={onClose}>{t.cancel}</button><button className="btn primary" disabled={!f.no || !(Number(f.total) > 0)} onClick={save}>{t.save} ({t.draft})</button></>}>
+    <ErrorBox error={err} />
+    <div className="form-grid">
+      <Field label={tt("رقم فاتورة المورد", "Supplier's invoice number")}><input dir="ltr" value={f.no} onChange={(e) => setF({ ...f, no: e.target.value })} /></Field>
+      <Field label={tt("قيمة الفاتورة", "Invoice total")}><input className="num" value={f.total} onChange={(e) => setF({ ...f, total: e.target.value })} /></Field>
+      <Field label={t.date}><input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></Field>
+    </div>
+    <p style={{ color: "var(--muted)" }}>{tt("قيمة الاستلام غير المفوترة:", "Uninvoiced receipt value:")} <b className="num">{fmt(String(remaining))}</b></p>
+    <label className="setting-row"><span><b>{tt("فاتورة نهائية لهذا الاستلام", "Final invoice for this receipt")}</b>
+      <small>{tt("تُقفل الاستلام؛ أي فرق في السعر يُضاف لقيمة البضاعة الموجودة بالمخزن (وحصة ما استُهلك منها لفروق المخزون).", "Closes the receipt; a price difference goes to the goods still in stock (the used share to stock differences).")}</small></span>
+      <input type="checkbox" className="toggle" checked={f.isFinal} onChange={(e) => setF({ ...f, isFinal: e.target.checked })} /></label>
+    {f.isFinal && Math.abs(diff) > 0.0005 && <div className={`alert ${diff > 0 ? "warn" : "info"}`}>{diff > 0
+      ? tt(`السعر أعلى من الاستلام بـ ${fmt(diff.toFixed(3))} — سيُرفع تكلفة البضاعة`, `Price is ${diff.toFixed(3)} higher than received — stock cost goes up`)
+      : tt(`السعر أقل من الاستلام بـ ${fmt((-diff).toFixed(3))} — ستنخفض تكلفة البضاعة`, `Price is ${(-diff).toFixed(3)} lower — stock cost goes down`)}</div>}
+    {!f.isFinal && diff > 0.0005 && <div className="alert bad">{tt("فاتورة جزئية لا تتجاوز المتبقي — علّمها «نهائية» إن تغيّر السعر.", "A partial invoice cannot exceed the remaining value — mark it final if the price changed.")}</div>}
+  </Modal>;
+}
+
+// ------------------------------------------------------------------ landed costs
+export function LandedCosts() {
+  const { t, tt } = useI18n();
+  const [editor, setEditor] = useState(false);
+  const [k, setK] = useState(0);
+  return <>
+    <DocList path="/purchasing/landed-costs" title={tt("التكاليف الإضافية للمشتريات", "Landed costs")} newLabel={tt("تكلفة إضافية", "New landed cost")} onNew={() => setEditor(true)} reloadKey={k}
+      createPerm="purchasing.landed.create" postPerm="purchasing.landed.post"
+      columns={[{ h: t.date, v: (r) => date(r.cost_date) }, { h: tt("البيان", "Description"), v: (r) => r.description }, { h: t.amount, v: (r) => money(r.amount), end: true },
+        { h: tt("على المخزون", "To stock"), v: (r) => r.capitalized ? money(r.capitalized) : "—", end: true }]}
+      renderDetail={(d) => <div className="grid" style={{ gap: 6 }}>
+        <div className="row"><b>{tt("الاستلام", "Receipt")} {d.receipt_number}</b><span>{d.supplier_name_ar}</span></div>
+        <div>{tt("التوزيع", "Split")}: {d.split === "qty" ? tt("حسب الكمية", "by quantity") : tt("حسب القيمة", "by value")} · {tt("دُفعت من", "Paid from")}: <span className="num">{d.account_code}</span> {d.account_name}</div>
+        {d.capitalized && <div>{tt("أضيف لقيمة المخزون", "Added to stock")}: <b className="num">{money(d.capitalized)}</b> · {tt("لفروق المخزون (بضاعة مستهلكة)", "To stock differences (used goods)")}: <b className="num">{money(d.expensed)}</b></div>}
+      </div>} />
+    {editor && <LandedEditor onClose={() => setEditor(false)} onSaved={() => { setEditor(false); setK(k + 1); }} />}
+  </>;
+}
+
+function LandedEditor({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const { t, tt } = useI18n();
+  const { companyId } = useSession();
+  const receipts = useAsync(() => api.get(`/purchasing/receipts?companyId=${companyId}&status=posted&pageSize=100`), [companyId]);
+  const accounts = useAsync(() => api.get(`/accounting/accounts?companyId=${companyId}&postableOnly=true`), [companyId]);
+  const [key] = useState(() => crypto.randomUUID());
+  const [f, setF] = useState({ receiptId: "", description: "", amount: "", split: "value", creditAccountId: "", costDate: today() });
+  const [err, setErr] = useState<unknown>(null);
+  const payFrom = (accounts.data ?? []).filter((a: any) => ["asset", "liability"].includes(a.type) && !["ar", "ap"].includes(a.role));
+  const save = async () => { setErr(null); try { await api.post("/purchasing/landed-costs", f, { idempotencyKey: key }); onSaved(); } catch (e) { setErr(e); } };
+  return <Modal title={tt("تكلفة إضافية على استلام", "Landed cost on a receipt")} onClose={onClose}
+    footer={<><button className="btn" onClick={onClose}>{t.cancel}</button><button className="btn primary" disabled={!f.receiptId || !f.creditAccountId || !(Number(f.amount) > 0) || f.description.length < 3} onClick={save}>{t.save} ({t.draft})</button></>}>
+    <div className="alert info">{tt("شحن، جمارك، تفريغ… تُضاف لتكلفة أصناف الاستلام الموجودة في المخزن، وتوزَّع حسب القيمة أو الكمية. لفاتورة من شركة شحن آجلة استعمل حسابًا وسيطًا (مستحقات).",
+      "Shipping, customs, unloading… added to the cost of the receipt's goods still in stock, split by value or quantity.")}</div>
+    <ErrorBox error={err} />
+    <div className="form-grid">
+      <Field label={tt("إذن الاستلام", "Goods receipt")}><select value={f.receiptId} onChange={(e) => setF({ ...f, receiptId: e.target.value })}><option value="">—</option>
+        {(receipts.data?.data ?? []).map((r: any) => <option key={r.id} value={r.id}>{r.number} · {r.party_name_ar} · {fmt(r.total)}</option>)}</select></Field>
+      <Field label={tt("البيان", "Description")}><input value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder={tt("مثال: شحن من الميناء", "e.g. freight from port")} /></Field>
+      <Field label={t.amount}><input className="num" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></Field>
+      <Field label={tt("التوزيع على الأصناف", "Split over items")}><select value={f.split} onChange={(e) => setF({ ...f, split: e.target.value })}>
+        <option value="value">{tt("حسب القيمة", "By value")}</option><option value="qty">{tt("حسب الكمية", "By quantity")}</option></select></Field>
+      <Field label={tt("دُفعت من", "Paid from")}><select value={f.creditAccountId} onChange={(e) => setF({ ...f, creditAccountId: e.target.value })}><option value="">—</option>
+        {payFrom.map((a: any) => <option key={a.id} value={a.id}>{a.code} — {a.name_ar}</option>)}</select></Field>
+      <Field label={t.date}><input type="date" value={f.costDate} onChange={(e) => setF({ ...f, costDate: e.target.value })} /></Field>
+    </div>
+  </Modal>;
 }
 
 function ReceiptEditor({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {

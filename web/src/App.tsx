@@ -21,7 +21,7 @@ import Parties from "./pages/erp/Parties";
 import Items from "./pages/erp/Items";
 import Stock from "./pages/erp/Stock";
 import SalesInvoices, { ArAging, Receipts, SalesReturns } from "./pages/erp/Sales";
-import PurchaseReceipts, { StockDocuments, SupplierInvoices } from "./pages/erp/Purchasing";
+import PurchaseReceipts, { LandedCosts, StockDocuments, SupplierInvoices } from "./pages/erp/Purchasing";
 import { PurchaseOrders, Quotations, SalesOrders } from "./pages/erp/Orders";
 import Settings from "./pages/Settings";
 import { CreditNotes, DebitNotes } from "./pages/erp/Notes";
@@ -68,6 +68,7 @@ export default function App() {
       <Route path="/settings" element={<Settings />} />
       <Route path="/sales/credit-notes" element={<CreditNotes />} />
       <Route path="/purchasing/debit-notes" element={<DebitNotes />} />
+      <Route path="/purchasing/landed-costs" element={<LandedCosts />} />
       <Route path="/sales/quotations" element={<Quotations />} />
       <Route path="/sales/orders" element={<SalesOrders />} />
       <Route path="/purchasing/orders" element={<PurchaseOrders />} />

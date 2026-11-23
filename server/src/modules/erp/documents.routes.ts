@@ -7,6 +7,7 @@ import { audit } from "../../core/audit.js";
 import * as sales from "./sales.service.js";
 import * as inv from "./inventory.service.js";
 import * as notes from "./notes.service.js";
+import * as landed from "./landed.service.js";
 
 const zQty = z.union([z.string(), z.number()]).transform((v) => String(v).trim()).refine((s) => /^-?\d{1,12}(\.\d{1,4})?$/.test(s) && Number(s) !== 0, "non-zero quantity with ≤ 4 decimals");
 const zPos = zQty.refine((s) => !s.startsWith("-"), "must be positive");
@@ -88,6 +89,11 @@ export async function documentRoutes(app: FastifyInstance) {
     extraFilter: "AND x.kind = 'supplier_debit'", bodySchema: zNote,
     create_: (db, u, b) => notes.createNote(db, u, "supplier_debit", b), post_: notes.postNote, get_: notes.getNote,
   });
+  registerDoc(app, {
+    path: "/purchasing/landed-costs", table: "landed_costs", tag: "Purchasing", view: "purchasing.receipts.view", create: "purchasing.landed.create", post: "purchasing.landed.post", dateCol: "cost_date",
+    bodySchema: z.object({ receiptId: zUuid, costDate: zDate, description: z.string().min(3).max(300), amount: zMoney.refine((s) => Number(s) > 0, "> 0"), split: z.enum(["value", "qty"]).default("value"), creditAccountId: zUuid }),
+    create_: landed.createLandedCost, post_: landed.postLandedCost, get_: landed.getLandedCost,
+  });
   const zPay = (dir: "in" | "out") => z.object({ companyId: zUuid, partyId: zUuid, method: z.enum(["cash", "bank", "rep_custody"]), paymentDate: zDate, amount: zMoney.refine((s) => Number(s) > 0, "> 0"),
     reference: z.string().max(200).optional(), ...(dir === "in" ? { salesInvoiceId: zUuid.nullable().optional() } : { supplierInvoiceId: zUuid }) }).transform((b) => ({ ...b, direction: dir }));
   const getPay = async (db: any, id: string) => ({ ...(await db.query("SELECT * FROM payments WHERE id = $1", [id])).rows[0], allocations: (await db.query("SELECT * FROM payment_allocations WHERE payment_id = $1", [id])).rows });
@@ -109,7 +115,7 @@ export async function documentRoutes(app: FastifyInstance) {
   registerDoc(app, {
     path: "/purchasing/invoices", table: "supplier_invoices", tag: "Purchasing", view: "purchasing.receipts.view", create: "purchasing.invoices.create", post: "purchasing.invoices.post",
     dateCol: "invoice_date", partyCol: "supplier_id",
-    bodySchema: z.object({ receiptId: zUuid, supplierInvoiceNo: z.string().min(1).max(60), invoiceDate: zDate, total: zMoney.refine((s) => Number(s) > 0, "> 0") }),
+    bodySchema: z.object({ receiptId: zUuid, supplierInvoiceNo: z.string().min(1).max(60), invoiceDate: zDate, total: zMoney.refine((s) => Number(s) > 0, "> 0"), isFinal: z.boolean().optional() }),
     create_: inv.createSupplierInvoice, post_: inv.postSupplierInvoice, get_: async (db, id) => (await db.query("SELECT * FROM supplier_invoices WHERE id = $1", [id])).rows[0] ?? Promise.reject(E.notFound("supplier invoice")),
   });
   registerDoc(app, {
