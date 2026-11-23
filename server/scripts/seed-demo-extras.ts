@@ -122,6 +122,8 @@ async function main() {
   await section("point of sale (register, open shift with sales)", async () => {
     const reg = await as("finance").post("/pos/registers", { companyId: C, branchId: branch, code: "DEMO-POS1", nameAr: "DEMO كاشير الصالة 1", warehouseId: FG, returnWarehouseId: QC,
       walkInCustomerId: customers[2].id, cashAccountId: acc["1113"], safeAccountId: acc["1111"], cardAccountId: acc["1121"], varianceAccountId: acc["404"], maxDiscountPct: "5" });
+    for (const [nameAr, kind, code] of [["DEMO بطاقة مصرفية", "card", "1121"], ["DEMO محفظة إلكترونية", "wallet", "1112"]] as const)
+      await as("finance").post("/pos/payment-methods", { companyId: C, nameAr, kind, accountId: acc[code] });
     const K = as("cashier");
     const shift = await K.post("/pos/shifts", { registerId: reg.id, openingFloat: "100", businessDate: day(0) });
     const sales: { itemId: string; qty: string; uomId?: string }[][] = [[{ itemId: chips, qty: "4" }], [{ itemId: corn, qty: "6" }, { itemId: chips, qty: "2" }], [{ itemId: chips, uomId: items["DEMO-CHIPS-40"].units?.[0]?.uomId, qty: "1" }]];
